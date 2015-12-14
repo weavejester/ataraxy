@@ -3,13 +3,24 @@
             [ataraxy.core :as ataraxy]))
 
 (deftest test-matches
-  (let [routes (ataraxy/compile {"/foo" :foo, "/bar" :bar})]
-    (is (= (ataraxy/matches routes {:uri "/foo"}) :foo))
-    (is (= (ataraxy/matches routes {:uri "/bar"}) :bar))
-    (is (nil? (ataraxy/matches routes {:uri "/baz"})))))
+  (testing "static routes"
+    (let [routes (ataraxy/compile '{"/foo" :foo, "/bar" :bar})]
+      (is (= (ataraxy/matches routes {:uri "/foo"}) :foo))
+      (is (= (ataraxy/matches routes {:uri "/bar"}) :bar))
+      (is (nil? (ataraxy/matches routes {:uri "/baz"})))))
+  (testing "parameters"
+    (let [routes (ataraxy/compile
+                  '{["/foo/" x]           [:foo x]
+                    ["/foo/" x "/bar/" y] [:foobar x y]
+                    ["/bar/" x]           :bar})]
+      (is (= (ataraxy/matches routes {:uri "/foo/10"})       [:foo "10"]))
+      (is (= (ataraxy/matches routes {:uri "/foo/8/bar/3a"}) [:foobar "8" "3a"]))
+      (is (= (ataraxy/matches routes {:uri "/bar/dd"})       :bar))
+      (is (nil? (ataraxy/matches routes {:uri "/foo"})))
+      (is (nil? (ataraxy/matches routes {:uri "/foo/44/bar/"}))))))
 
 (deftest test-generate
-  (let [routes (ataraxy/compile {"/foo" :foo, "/bar" :bar})]
+  (let [routes (ataraxy/compile '{"/foo" :foo, "/bar" :bar})]
     (is (= (ataraxy/generate routes :foo) {:uri "/foo"}))
     (is (= (ataraxy/generate routes :bar) {:uri "/bar"}))
     (is (nil? (ataraxy/generate routes :baz)))))
