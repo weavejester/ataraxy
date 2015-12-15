@@ -8,6 +8,10 @@
       (is (= (ataraxy/matches routes {:uri "/foo"}) [:foo]))
       (is (= (ataraxy/matches routes {:uri "/bar"}) [:bar]))
       (is (nil? (ataraxy/matches routes {:uri "/baz"})))))
+  (testing "compiled routes"
+    (let [routes (ataraxy/compile '{"/foo" :foo})]
+      (is (= (ataraxy/matches routes {:uri "/foo"}) [:foo]))
+      (is (nil? (ataraxy/matches routes {:uri "/bar"})))))
   (testing "parameters"
     (let [routes '{["/foo/" x]           [:foo x]
                    ["/foo/" x "/bar/" y] [:foobar x y]}]
