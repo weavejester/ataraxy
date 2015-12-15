@@ -33,13 +33,12 @@
 (defn- compile-generate [routes]
   (let [result (gensym "result")]
     `(fn [~result]
-       (let [~result (if (vector? ~result) ~result [~result])]
-         (case (first ~result)
-           ~@(mapcat
-              (fn [[route [result-key & args]]]
-                [result-key `(let [[~@args] (rest ~result)] {:uri (str ~@route)})])
-              routes)
-           nil)))))
+       (case (first ~result)
+         ~@(mapcat
+            (fn [[route [result-key & args]]]
+              [result-key `(let [[~@args] (rest ~result)] {:uri (str ~@route)})])
+            routes)
+         nil))))
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.Keyword ::keyword)
@@ -61,13 +60,24 @@
               (normalize-result result)])))
 
 (defprotocol Routes
-  (matches [routes request])
-  (generate [routes result]))
+  (-matches [routes request])
+  (-generate [routes result]))
 
 (defn compile [routes]
-  (let [routes'     (normalize routes)
-        matches-fn  (eval (compile-matches routes'))
-        generate-fn (eval (compile-generate routes'))]
+  (let [routes   (normalize routes)
+        matches  (eval (compile-matches routes))
+        generate (eval (compile-generate routes))]
     (reify Routes
-      (matches [_ request] (matches-fn request))
-      (generate [_ result] (generate-fn result)))))
+      (-matches [_ request] (matches request))
+      (-generate [_ result] (generate result)))))
+
+(defn matches [routes request]
+  (if (satisfies? Routes routes)
+    (-matches routes request)
+    (-matches (compile routes) request)))
+
+(defn generate [routes result]
+  (let [result (normalize-result result)]
+    (if (satisfies? Routes routes)
+      (-generate routes result)
+      (-generate (compile routes) result))))
