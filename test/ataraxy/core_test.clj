@@ -5,8 +5,8 @@
 (deftest test-matches
   (testing "static routes"
     (let [routes (ataraxy/compile '{"/foo" :foo, "/bar" :bar})]
-      (is (= (ataraxy/matches routes {:uri "/foo"}) :foo))
-      (is (= (ataraxy/matches routes {:uri "/bar"}) :bar))
+      (is (= (ataraxy/matches routes {:uri "/foo"}) [:foo]))
+      (is (= (ataraxy/matches routes {:uri "/bar"}) [:bar]))
       (is (nil? (ataraxy/matches routes {:uri "/baz"})))))
   (testing "parameters"
     (let [routes (ataraxy/compile

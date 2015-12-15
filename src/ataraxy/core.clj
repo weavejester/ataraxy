@@ -3,45 +3,16 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]))
 
-(defprotocol Routes
-  (matches [routes request])
-  (generate [routes result]))
-
-(derive clojure.lang.IPersistentVector ::vector)
-(derive clojure.lang.Keyword ::keyword)
-(derive java.lang.String ::string)
-
 (defn- re-quote [s]
   (java.util.regex.Pattern/quote s))
 
-(defmulti ^:private compile-pattern type)
-
-(defmethod compile-pattern ::string [route]
-  (re-quote route))
-
-(defmethod compile-pattern ::vector [route]
+(defn- compile-pattern [route]
   (str/join (map #(if (string? %) (re-quote %) "([^/]+)") route)))
 
 (defn- join-patterns [patterns]
   (re-pattern (str/join "|" (map #(str "(" % ")") patterns))))
 
-(defmulti ^:private compile-match-clause
-  (fn [[route result]] [(type route) (type result)]))
-
-(defmethod compile-match-clause [::string ::keyword] [[route result]]
-  (let [matching (gensym (name result))]
-    {:bindings [matching], :result result}))
-
-(defmethod compile-match-clause [::string ::vector] [[route result]]
-  (let [matching (gensym (name (first result)))]
-    {:bindings [matching], :result result}))
-
-(defmethod compile-match-clause [::vector ::keyword] [[route result]]
-  (let [matching (gensym (name result))
-        groups   (map gensym (filter symbol? route))]
-    {:bindings (into [matching] groups), :result result}))
-
-(defmethod compile-match-clause [::vector ::vector] [[route result]]
+(defn- compile-match-clause [[route result]]
   (let [matching (gensym (name (first result)))
         params   (filter symbol? route)
         groups   (map gensym params)
@@ -59,32 +30,44 @@
        (let [[~@bindings] (rest (re-matches ~pattern (:uri request#)))]
          (cond ~@conds)))))
 
-(defmulti ^:private compile-result-case
-  (fn [_ [route result]] [(type route) (type result)]))
-
-(defmethod compile-result-case [::string ::keyword] [_ [route result]]
-  [result {:uri route}])
-
-(defmethod compile-result-case [::string ::vector] [_ [route [kw & _]]]
-  [kw {:uri route}])
-
-(defmethod compile-result-case [::vector ::keyword] [_ [route result]]
-  [result {:uri `(str ~@route)}])
-
-(defmethod compile-result-case [::vector ::vector] [result-sym [route [kw & args]]]
-  [kw `(let [[~@args] (rest ~result-sym)] {:uri (str ~@route)})])
-
 (defn- compile-generate [routes]
-  (let [result (gensym "result")
-        cases  (mapcat (partial compile-result-case result) routes)]
+  (let [result (gensym "result")]
     `(fn [~result]
-       (case (if (vector? ~result) (first ~result) ~result)
-         ~@cases
-         nil))))
+       (let [~result (if (vector? ~result) ~result [~result])]
+         (case (first ~result)
+           ~@(mapcat
+              (fn [[route [result-key & args]]]
+                [result-key `(let [[~@args] (rest ~result)] {:uri (str ~@route)})])
+              routes)
+           nil)))))
+
+(derive clojure.lang.IPersistentVector ::vector)
+(derive clojure.lang.Keyword ::keyword)
+(derive java.lang.String ::string)
+
+(defmulti ^:private normalize-route type)
+
+(defmethod normalize-route ::string [route] [route])
+(defmethod normalize-route ::vector [route] route)
+
+(defmulti ^:private normalize-result type)
+
+(defmethod normalize-result ::keyword [route] [route])
+(defmethod normalize-result ::vector  [route] route)
+
+(defn normalize [routes]
+  (into {} (for [[route result] routes]
+             [(normalize-route route)
+              (normalize-result result)])))
+
+(defprotocol Routes
+  (matches [routes request])
+  (generate [routes result]))
 
 (defn compile [routes]
-  (let [matches*  (eval (compile-matches routes))
-        generate* (eval (compile-generate routes))]
+  (let [routes'     (normalize routes)
+        matches-fn  (eval (compile-matches routes'))
+        generate-fn (eval (compile-generate routes'))]
     (reify Routes
-      (matches [_ request] (matches* request))
-      (generate [_ result] (generate* result)))))
+      (matches [_ request] (matches-fn request))
+      (generate [_ result] (generate-fn result)))))
