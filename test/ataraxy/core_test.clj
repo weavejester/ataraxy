@@ -35,4 +35,8 @@
                    ["/foo/" x "/bar/" y] [:foobar x y]}]
       (is (= (ataraxy/generate routes [:foo "10"])        {:uri "/foo/10"}))
       (is (= (ataraxy/generate routes [:foobar "8" "3a"]) {:uri "/foo/8/bar/3a"} ))
-      (is (nil? (ataraxy/generate routes [:bar]))))))
+      (is (nil? (ataraxy/generate routes [:bar])))))
+  (testing "methods"
+    (let [routes '{(:get ["/foo/" id]) [:foo id]}]
+      (is (= (ataraxy/generate routes [:foo "10"]) {:request-method :get, :uri "/foo/10"}))
+      (is (nil? (ataraxy/generate routes [:bar "10"]))))))

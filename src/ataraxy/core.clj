@@ -41,13 +41,18 @@
          ~@clauses
          ~'[_ _] nil))))
 
+(defn- compile-request [[method path]]
+  (if (= method '_)
+    `{:uri (str ~@path)}
+    `{:request-method ~method, :uri (str ~@path)}))
+
 (defn- compile-generate [routes]
   (let [result (gensym "result")]
     `(fn [~result]
        (case (first ~result)
          ~@(mapcat
-            (fn [[[_ path _] [result-key & args]]]
-              [result-key `(let [[~@args] (rest ~result)] {:uri (str ~@path)})])
+            (fn [[route [result-key & args]]]
+              [result-key `(let [[~@args] (rest ~result)] ~(compile-request route))])
             routes)
          nil))))
 
