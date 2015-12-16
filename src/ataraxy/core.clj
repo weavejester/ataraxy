@@ -1,7 +1,8 @@
 (ns ataraxy.core
   (:refer-clojure :exclude [compile])
   (:require [clojure.set :as set]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.core.match :refer [match]]))
 
 (defn- re-quote [s]
   (java.util.regex.Pattern/quote s))
@@ -10,25 +11,28 @@
   (str/join (map #(if (string? %) (re-quote %) "([^/]+)") route)))
 
 (defn- join-patterns [patterns]
-  (re-pattern (str/join "|" (map #(str "(" % ")") patterns))))
+  (re-pattern (str/join "|" (map #(str "()" %) patterns))))
 
-(defn- compile-match-clause [[route result]]
-  (let [matching (gensym (name (first result)))
-        params   (filter symbol? route)
-        groups   (map gensym params)
-        mapping  (zipmap params groups)]
-    {:bindings (into [matching] groups)
-     :result   (mapv #(mapping % %) result)}))
+(defn- add-route-binding [bindings route]
+  (let [binds      (into [""] (filter symbol? route))
+        inc-blanks (repeat (count binds) '_)
+        new-blanks (repeat (count (first bindings)) '_)]
+    (-> (mapv #(into % inc-blanks) bindings)
+        (conj (into (vec new-blanks) binds)))))
+
+(defn- compile-bindings [routes]
+  (->> (reduce add-route-binding [] routes)
+       (map (partial into '[_]))))
 
 (defn- compile-matches [routes]
   (let [routes   (seq routes)
         pattern  (join-patterns (map compile-pattern (keys routes)))
-        clauses  (map compile-match-clause routes)
-        bindings (mapcat :bindings clauses)
-        conds    (mapcat (juxt (comp first :bindings) :result) clauses)]
+        bindings (compile-bindings (keys routes))
+        clauses  (interleave bindings (vals routes))]
     `(fn [request#]
-       (let [[~@bindings] (rest (re-matches ~pattern (:uri request#)))]
-         (cond ~@conds)))))
+       (match (re-matches ~pattern (:uri request#))
+         ~@clauses
+         ~'_ nil))))
 
 (defn- compile-generate [routes]
   (let [result (gensym "result")]
