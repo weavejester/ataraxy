@@ -18,7 +18,11 @@
       (is (= (ataraxy/matches routes {:uri "/foo/10"})       [:foo "10"]))
       (is (= (ataraxy/matches routes {:uri "/foo/8/bar/3a"}) [:foobar "8" "3a"]))
       (is (nil? (ataraxy/matches routes {:uri "/foo"})))
-      (is (nil? (ataraxy/matches routes {:uri "/foo/44/bar/"}))))))
+      (is (nil? (ataraxy/matches routes {:uri "/foo/44/bar/"})))))
+  (testing "methods"
+    (let [routes '{(:get ["/foo/" id]) [:foo id]}]
+      (is (= (ataraxy/matches routes {:request-method :get, :uri "/foo/10"}) [:foo "10"]))
+      (is (nil? (ataraxy/matches routes {:request-method :post, :uri "/foo/10"}))))))
 
 (deftest test-generate
   (testing "static routes"

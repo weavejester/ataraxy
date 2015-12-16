@@ -7,22 +7,28 @@
 (defn- re-quote [s]
   (java.util.regex.Pattern/quote s))
 
-(defn- compile-pattern [route]
-  (str/join (map #(if (string? %) (re-quote %) "([^/]+)") route)))
+(defn- compile-pattern [[_ path _]]
+  (str/join (map #(if (string? %) (re-quote %) "([^/]+)") path)))
 
 (defn- join-patterns [patterns]
   (re-pattern (str/join "|" (map #(str "()" %) patterns))))
 
-(defn- add-route-binding [bindings route]
+(defn- add-path-binding [bindings route]
   (let [binds      (into [""] (filter symbol? route))
         inc-blanks (repeat (count binds) '_)
         new-blanks (repeat (count (first bindings)) '_)]
     (-> (mapv #(into % inc-blanks) bindings)
         (conj (into (vec new-blanks) binds)))))
 
-(defn- compile-bindings [routes]
-  (->> (reduce add-route-binding [] routes)
+(defn- compile-path-bindings [routes]
+  (->> (map second routes)
+       (reduce add-path-binding [])
        (map (partial into '[_]))))
+
+(defn- compile-bindings [routes]
+  (map (fn [path [method _]] [method path])
+       (compile-path-bindings routes)
+       routes))
 
 (defn- compile-matches [routes]
   (let [routes   (seq routes)
@@ -30,28 +36,31 @@
         bindings (compile-bindings (keys routes))
         clauses  (interleave bindings (vals routes))]
     `(fn [request#]
-       (match (re-matches ~pattern (:uri request#))
+       (match [(:request-method request#)
+               (re-matches ~pattern (:uri request#))]
          ~@clauses
-         ~'_ nil))))
+         ~'[_ _] nil))))
 
 (defn- compile-generate [routes]
   (let [result (gensym "result")]
     `(fn [~result]
        (case (first ~result)
          ~@(mapcat
-            (fn [[route [result-key & args]]]
-              [result-key `(let [[~@args] (rest ~result)] {:uri (str ~@route)})])
+            (fn [[[_ path _] [result-key & args]]]
+              [result-key `(let [[~@args] (rest ~result)] {:uri (str ~@path)})])
             routes)
          nil))))
 
 (derive clojure.lang.IPersistentVector ::vector)
+(derive clojure.lang.IPersistentList ::list)
 (derive clojure.lang.Keyword ::keyword)
 (derive java.lang.String ::string)
 
 (defmulti ^:private normalize-route type)
 
-(defmethod normalize-route ::string [route] [route])
-(defmethod normalize-route ::vector [route] route)
+(defmethod normalize-route ::string [route] (normalize-route [route]))
+(defmethod normalize-route ::vector [route] (list '_ route '_))
+(defmethod normalize-route ::list   [route] route)
 
 (defmulti ^:private normalize-result type)
 
