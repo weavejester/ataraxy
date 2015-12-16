@@ -30,6 +30,10 @@
       (is (= (ataraxy/generate routes :foo) {:uri "/foo"}))
       (is (= (ataraxy/generate routes :bar) {:uri "/bar"}))
       (is (nil? (ataraxy/generate routes :baz)))))
+  (testing "compiled routes"
+    (let [routes (ataraxy/compile '{"/foo" :foo})]
+      (is (= (ataraxy/generate routes [:foo])  {:uri "/foo"}))
+      (is (nil? (ataraxy/generate routes [:bar])))))
   (testing "parameters"
     (let [routes '{["/foo/" x]           [:foo x]
                    ["/foo/" x "/bar/" y] [:foobar x y]}]
