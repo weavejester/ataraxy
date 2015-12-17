@@ -48,35 +48,40 @@
 (deftest test-generate
   (testing "static routes"
     (let [routes '{"/foo" :foo, "/bar" :bar}]
-      (is (= (ataraxy/generate routes :foo) {:uri "/foo"}))
-      (is (= (ataraxy/generate routes :bar) {:uri "/bar"}))
-      (is (nil? (ataraxy/generate routes :baz)))))
+      (are [res req] (= (ataraxy/generate routes res) req)
+        :foo {:uri "/foo"}
+        :bar {:uri "/bar"}
+        :baz nil)))
 
   (testing "compiled routes"
     (let [routes (ataraxy/compile '{"/foo" :foo})]
-      (is (= (ataraxy/generate routes [:foo])  {:uri "/foo"}))
-      (is (nil? (ataraxy/generate routes [:bar])))))
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:foo] {:uri "/foo"}
+        [:bar] nil)))
 
   (testing "parameters"
     (let [routes '{["/foo/" x]           [:foo x]
                    ["/foo/" x "/bar/" y] [:foobar x y]}]
-      (is (= (ataraxy/generate routes [:foo "10"])        {:uri "/foo/10"}))
-      (is (= (ataraxy/generate routes [:foobar "8" "3a"]) {:uri "/foo/8/bar/3a"} ))
-      (is (nil? (ataraxy/generate routes [:bar])))))
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:foo "10"]        {:uri "/foo/10"}
+        [:foobar "8" "3a"] {:uri "/foo/8/bar/3a"}
+        [:bar]             nil)))
 
   (testing "methods"
     (let [routes '{(:get ["/foo/" id]) [:foo id]}]
-      (is (= (ataraxy/generate routes [:foo "10"]) {:request-method :get, :uri "/foo/10"}))
-      (is (nil? (ataraxy/generate routes [:bar "10"])))))
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:foo "10"] {:request-method :get, :uri "/foo/10"}
+        [:bar "10"] nil)))
 
   (testing "request restructuring"
-    (let [routes '{(:get ["/search"] {:params {:q q}}) [:search q]}]
-      (is (= (ataraxy/generate routes [:search "foobar"])
-             {:request-method :get
-              :uri "/search"
-              :params {:q "foobar"}}))))
+    (let [routes '{(:get ["/find"] {:params {:q q}}) [:find q]}]
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:find "x"]  {:request-method, :get :uri "/find", :params {:q "x"}}
+        [:found "x"] nil)))
 
   (testing "partial routes"
-    (let [routes '{("/foo" {:params {:q q}}) [:foo q]}]
-      (is (= (ataraxy/generate routes [:foo "x"])
-             {:uri "/foo", :params {:q "x"}})))))
+    (let [routes '{("/foo"   {:params {:q q}}) [:foo q]
+                   (["/bar"] {:params {:q q}}) [:bar q]}]
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:foo "x"] {:uri "/foo", :params {:q "x"}}
+        [:bar "x"] {:uri "/bar", :params {:q "x"}}))))
