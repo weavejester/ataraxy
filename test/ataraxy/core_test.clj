@@ -26,9 +26,12 @@
         {:uri "/foo/44/bar/"}  nil)))
 
   (testing "methods"
-    (let [routes '{(:get ["/foo/" id]) [:foo id]}]
+    (let [routes '{(:get ["/foo/" id])  [:foo id]
+                   (method ["/bar/" id]) [:bar method id]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get, :uri "/foo/10"}  [:foo "10"]
+        {:request-method :get, :uri "/bar/20"}  [:bar :get "20"]
+        {:request-method :post, :uri "/bar/12"} [:bar :post "12"]
         {:request-method :post, :uri "/foo/10"} nil)))
 
   (testing "request destructuring"
