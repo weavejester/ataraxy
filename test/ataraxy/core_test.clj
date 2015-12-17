@@ -1,6 +1,17 @@
 (ns ataraxy.core-test
-  (:require [clojure.test :refer :all]
-            [ataraxy.core :as ataraxy]))
+  (:require [ataraxy.core :as ataraxy]
+            [com.gfredericks.test.chuck.clojure-test :refer [checking]]
+            [com.gfredericks.test.chuck.generators :as gen2]
+            [clojure.test :refer [deftest testing is]]
+            [clojure.test.check.clojure-test :refer [defspec]]
+            [clojure.test.check.generators :as gen]
+            [clojure.test.check.properties :as prop]))
+
+(deftest check-matches
+  (checking "static routes" 10
+    [key gen/keyword
+     uri (gen2/string-from-regex #"(/[a-z])+")]
+    (is (= (ataraxy/matches {[uri] key} {:uri uri}) [key]))))
 
 (deftest test-matches
   (testing "static routes"
