@@ -60,20 +60,35 @@
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.IPersistentList ::list)
+(derive clojure.lang.IPersistentMap ::map)
 (derive clojure.lang.Keyword ::keyword)
 (derive java.lang.String ::string)
+(derive java.lang.Object ::any)
 
-(defmulti ^:private normalize-route type)
+(defn- normalize-route-list [[a b c :as route]]
+  (condp #(isa? %2 %1) (mapv type route)
+    [::keyword]          (list a '_ '_)
+    [::string]           (list '_ a '_)
+    [::map]              (list '_ '_ a)
+    [::keyword ::string] (list a [b] '_)
+    [::keyword ::vector] (list a b '_)
+    [::keyword ::map]    (list a '_ b)
+    [::string  ::map]    (list '_ [a] b)
+    [::vector  ::map]    (list '_ a b)
+    [::any ::any ::any]  (list a b c)))
 
-(defmethod normalize-route ::string [route] (list '_ [route] '_))
-(defmethod normalize-route ::vector [route] (list '_ route '_))
-(defmethod normalize-route ::list   [route]
-  (list* (concat route (repeat (- 3 (count route)) '_))))
+(defn- normalize-route [route]
+  (condp #(isa? %2 %1) (type route)
+    ::keyword (list route '_ '_)
+    ::string  (list '_ [route] '_)
+    ::vector  (list '_ route '_)
+    ::map     (list '_ '_ route)
+    ::list    (normalize-route-list route)))
 
-(defmulti ^:private normalize-result type)
-
-(defmethod normalize-result ::keyword [route] [route])
-(defmethod normalize-result ::vector  [route] route)
+(defn- normalize-result [route]
+  (condp #(isa? %2 %1) (type route)
+    ::keyword [route]
+    ::vector  route))
 
 (defn normalize [routes]
   (into {} (for [[route result] routes]

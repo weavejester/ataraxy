@@ -32,7 +32,12 @@
       (is (= (ataraxy/matches routes {:request-method :get
                                       :uri "/search"
                                       :params {:q "foobar"}})
-             [:search "foobar"])))))
+             [:search "foobar"]))))
+
+  (testing "partial routes"
+    (let [routes '{("/foo" {:params {:q q}}) [:foo q]}]
+      (is (= (ataraxy/matches routes {:uri "/foo", :params {:q "x"}})
+             [:foo "x"])))))
 
 (deftest test-generate
   (testing "static routes"
@@ -63,4 +68,9 @@
       (is (= (ataraxy/generate routes [:search "foobar"])
              {:request-method :get
               :uri "/search"
-              :params {:q "foobar"}})))))
+              :params {:q "foobar"}}))))
+
+  (testing "partial routes"
+    (let [routes '{("/foo" {:params {:q q}}) [:foo q]}]
+      (is (= (ataraxy/generate routes [:foo "x"])
+             {:uri "/foo", :params {:q "x"}})))))
