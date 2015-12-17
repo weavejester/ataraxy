@@ -26,7 +26,7 @@
        (map (partial into '[_]))))
 
 (defn- compile-bindings [routes]
-  (map (fn [path [method _]] [method path])
+  (map (fn [path [method _ request]] [method path request])
        (compile-path-bindings routes)
        routes))
 
@@ -37,14 +37,16 @@
         clauses  (interleave bindings (vals routes))]
     `(fn [request#]
        (match [(:request-method request#)
-               (re-matches ~pattern (:uri request#))]
+               (re-matches ~pattern (:uri request#))
+               request#]
          ~@clauses
-         ~'[_ _] nil))))
+         ~'[_ _ _] nil))))
 
-(defn- compile-request [[method path]]
-  (if (= method '_)
-    `{:uri (str ~@path)}
-    `{:request-method ~method, :uri (str ~@path)}))
+(defn- compile-request [[method path request]]
+  (merge
+   (if (not= method '_) `{:request-method ~method})
+   (if (not= path '_ )  `{:uri (str ~@path)})
+   (if (not= request '_) request)))
 
 (defn- compile-generate [routes]
   (let [result (gensym "result")]
@@ -63,9 +65,10 @@
 
 (defmulti ^:private normalize-route type)
 
-(defmethod normalize-route ::string [route] (normalize-route [route]))
+(defmethod normalize-route ::string [route] (list '_ [route] '_))
 (defmethod normalize-route ::vector [route] (list '_ route '_))
-(defmethod normalize-route ::list   [route] route)
+(defmethod normalize-route ::list   [route]
+  (list* (concat route (repeat (- 3 (count route)) '_))))
 
 (defmulti ^:private normalize-result type)
 

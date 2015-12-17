@@ -22,7 +22,13 @@
   (testing "methods"
     (let [routes '{(:get ["/foo/" id]) [:foo id]}]
       (is (= (ataraxy/matches routes {:request-method :get, :uri "/foo/10"}) [:foo "10"]))
-      (is (nil? (ataraxy/matches routes {:request-method :post, :uri "/foo/10"}))))))
+      (is (nil? (ataraxy/matches routes {:request-method :post, :uri "/foo/10"})))))
+  (testing "request destructuring"
+    (let [routes '{(:get ["/search"] {:params {:q q}}) [:search q]}]
+      (is (= (ataraxy/matches routes {:request-method :get
+                                      :uri "/search"
+                                      :params {:q "foobar"}})
+             [:search "foobar"])))))
 
 (deftest test-generate
   (testing "static routes"
@@ -43,4 +49,10 @@
   (testing "methods"
     (let [routes '{(:get ["/foo/" id]) [:foo id]}]
       (is (= (ataraxy/generate routes [:foo "10"]) {:request-method :get, :uri "/foo/10"}))
-      (is (nil? (ataraxy/generate routes [:bar "10"]))))))
+      (is (nil? (ataraxy/generate routes [:bar "10"])))))
+  (testing "request restructuring"
+    (let [routes '{(:get ["/search"] {:params {:q q}}) [:search q]}]
+      (is (= (ataraxy/generate routes [:search "foobar"])
+             {:request-method :get
+              :uri "/search"
+              :params {:q "foobar"}})))))
