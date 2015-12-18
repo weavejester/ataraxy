@@ -62,19 +62,22 @@
 (derive clojure.lang.IPersistentList ::list)
 (derive clojure.lang.IPersistentMap ::map)
 (derive clojure.lang.Keyword ::keyword)
+(derive clojure.lang.Symbol ::symbol)
 (derive java.lang.String ::string)
 (derive java.lang.Object ::any)
 
 (defn- normalize-route-list [[a b c :as route]]
   (condp #(isa? %2 %1) (mapv type route)
     [::keyword]         (list a '_ '_)
-    [::string]          (list '_ a '_)
+    [::string]          (list '_ [a] '_)
+    [::vector]          (list '_ a '_)
     [::map]             (list '_ '_ a)
     [::any ::string]    (list a [b] '_)
-    [::any ::vector]    (list a b '_)
     [::keyword ::map]   (list a '_ b)
     [::string ::map]    (list '_ [a] b)
     [::vector ::map]    (list '_ a b)
+    [::symbol ::map]    (list '_ a b)
+    [::any ::any]       (list a b '_)
     [::any ::any ::any] (list a b c)))
 
 (defn- normalize-route [route]
