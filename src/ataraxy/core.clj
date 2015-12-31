@@ -8,44 +8,33 @@
   (java.util.regex.Pattern/quote s))
 
 (defn- compile-pattern [[_ path _]]
-  (str/join (map #(if (string? %) (re-quote %) "([^/]+)") path)))
+  (re-pattern (str/join (map #(if (string? %) (re-quote %) "([^/]+)") path))))
 
-(defn- join-patterns [patterns]
-  (re-pattern (str/join "|" (map #(str "()" %) patterns))))
+(defn- compile-path-bindings [path]
+  (if-let [symbols (seq (filter symbol? path))]
+    (vec (cons '_ symbols))
+    '(_ :guard some?)))
 
-(defn- add-path-binding [bindings route]
-  (let [binds      (into [""] (filter symbol? route))
-        inc-blanks (repeat (count binds) '_)
-        new-blanks (repeat (count (first bindings)) '_)]
-    (-> (mapv #(into % inc-blanks) bindings)
-        (conj (into (vec new-blanks) binds)))))
+(defn- compile-bindings [[method path request]]
+  [method (compile-path-bindings path) request])
 
-(defn- compile-path-bindings [routes]
-  (->> (map second routes)
-       (reduce add-path-binding [])
-       (map (partial into '[_]))))
-
-(defn- compile-bindings [routes]
-  (map (fn [path [method _ request]] [method path request])
-       (compile-path-bindings routes)
-       routes))
+(defn- compile-clauses [request routes]
+  (if-let [[[route result] & routes] routes]
+    `(match [(:request-method ~request)
+             (re-matches ~(compile-pattern route) (:uri ~request))
+             ~request]
+       ~(compile-bindings route) ~result
+       :else ~(compile-clauses request routes))
+    nil))
 
 (defn- compile-matches [routes]
-  (let [routes   (seq routes)
-        pattern  (join-patterns (map compile-pattern (keys routes)))
-        bindings (compile-bindings (keys routes))
-        clauses  (interleave bindings (vals routes))]
-    `(fn [request#]
-       (match [(:request-method request#)
-               (re-matches ~pattern (:uri request#))
-               request#]
-         ~@clauses
-         ~'[_ _ _] nil))))
+  (let [request (gensym "request")]
+    `(fn [~request] ~(compile-clauses request (seq routes)))))
 
 (defn- compile-request [[method path request]]
   (merge
    (if (not= method '_) `{:request-method ~method})
-   (if (not= path '_ )  `{:uri (str ~@path)})
+   (if (not= path '_)   `{:uri (str ~@path)})
    (if (not= request '_) request)))
 
 (defn- compile-generate [routes]
