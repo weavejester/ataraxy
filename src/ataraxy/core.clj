@@ -4,96 +4,107 @@
             [clojure.string :as str]
             [clojure.core.match :refer [match]]))
 
-(defn- re-quote [s]
-  (java.util.regex.Pattern/quote s))
-
-(defn- compile-pattern [[_ path _]]
-  (re-pattern (str/join (map #(if (string? %) (re-quote %) "([^/]+)") path))))
-
-(defn- compile-path-bindings [path]
-  (if-let [symbols (seq (filter symbol? path))]
-    (vec (cons '_ symbols))
-    '(_ :guard some?)))
-
-(defn- compile-bindings [[method path request]]
-  [method (compile-path-bindings path) request])
-
-(defn- compile-clauses [request routes]
-  (if-let [[[route result] & routes] routes]
-    `(match [(:request-method ~request)
-             (re-matches ~(compile-pattern route) (:uri ~request))
-             ~request]
-       ~(compile-bindings route) ~result
-       :else ~(compile-clauses request routes))
-    nil))
-
-(defn- compile-matches [routes]
-  (let [request (gensym "request")]
-    `(fn [~request] ~(compile-clauses request (seq routes)))))
-
-(defn- compile-request [[method path request]]
-  (merge
-   (if (not= method '_) `{:request-method ~method})
-   (if (not= path '_)   `{:uri (str ~@path)})
-   (if (not= request '_) request)))
-
-(defn- compile-generate [routes]
-  (let [result (gensym "result")]
-    `(fn [~result]
-       (case (first ~result)
-         ~@(mapcat
-            (fn [[route [result-key & args]]]
-              [result-key `(let [[~@args] (rest ~result)] ~(compile-request route))])
-            routes)
-         nil))))
-
 (derive clojure.lang.IPersistentVector ::vector)
-(derive clojure.lang.IPersistentList ::list)
 (derive clojure.lang.IPersistentMap ::map)
 (derive clojure.lang.Keyword ::keyword)
-(derive clojure.lang.Symbol ::symbol)
 (derive java.lang.String ::string)
-(derive java.lang.Object ::any)
 
-(defn- normalize-route-list [[a b c :as route]]
-  (condp #(isa? %2 %1) (mapv type route)
-    [::keyword]         (list a '_ '_)
-    [::string]          (list '_ [a] '_)
-    [::vector]          (list '_ a '_)
-    [::map]             (list '_ '_ a)
-    [::any ::string]    (list a [b] '_)
-    [::keyword ::map]   (list a '_ b)
-    [::string ::map]    (list '_ [a] b)
-    [::vector ::map]    (list '_ a b)
-    [::symbol ::map]    (list '_ a b)
-    [::any ::any]       (list a b '_)
-    [::any ::any ::any] (list a b c)))
+(defmulti ^:private compile-clause
+  (fn [state route] (type (first route))))
 
-(defn- normalize-route [route]
-  (condp #(isa? %2 %1) (type route)
-    ::keyword (list route '_ '_)
-    ::string  (list '_ [route] '_)
-    ::vector  (list '_ route '_)
-    ::map     (list '_ '_ route)
-    ::list    (normalize-route-list route)))
+(defmulti ^:private compile-result
+  (fn [state result] (type result)))
 
-(defn- normalize-result [route]
-  (condp #(isa? %2 %1) (type route)
-    ::keyword [route]
-    ::vector  route))
+(defn- compile-conditions [state routes]
+  `(or ~@(map (partial compile-clause state) routes)))
 
-(defn normalize [routes]
-  (into {} (for [[route result] routes]
-             [(normalize-route route)
-              (normalize-result result)])))
+(defmethod compile-result ::vector [{:keys [path path-matched?]} result]
+  (if path-matched?
+    `(if (= ~path "") ~result)
+    result))
+
+(defmethod compile-result ::map [state result]
+  (compile-conditions state result))
+
+(defmethod compile-clause ::keyword [{:keys [request] :as state} [route result]]
+  `(if (= (:request-method ~request) ~route)
+     ~(compile-result state result)))
+
+(defmethod compile-clause ::map [{:keys [request] :as state} [route result]]
+  `(match [~request]
+     [~route] ~(compile-result state result)
+     :else  nil))
+
+(defmethod compile-clause ::string [state [route result]]
+  (compile-clause state [[route] result]))
+
+(defn- compile-regex-part [value]
+  (if (string? value)
+    (java.util.regex.Pattern/quote value)
+    "([^/]+)"))
+
+(defn- compile-regex [route]
+  (re-pattern (str (str/join (map compile-regex-part route)) "(.*)")))
+
+(defn- compile-groups [route path]
+  `[~'_ ~@(filter symbol? route) ~path])
+
+(defmethod compile-clause ::vector [{:keys [path] :as state} [route result]]
+  `(if-let [~(compile-groups route path) (re-matches ~(compile-regex route) ~path)]
+     ~(compile-result (assoc state :path-matched? true) result)))
+
+(defn- compile-matches [routes]
+  (let [request (gensym "request")
+        path    (gensym "path")]
+    `(fn [~request]
+       (let [~path (or (:path-info ~request) (:uri ~request))]
+         ~(compile-conditions {:request request, :path path} routes)))))
+
+(defn- flatten-routes [routes]
+  (mapcat
+   (fn [[route result]]
+     (if (map? result)
+       (for [[route' result'] (flatten-routes result)]
+         [(into [route] route') result'])
+       [[[route] result]]))
+   routes))
+
+(defn- route->request [route]
+  (cond
+    (keyword? route) {:request-method route}
+    (vector? route)  {:uri route}
+    (string? route)  {:uri [route]}
+    (map? route)     route))
+
+(defn- merge-requests [a b]
+  (cond
+    (and (map? a) (map? b))   (merge-with merge-requests a b)
+    (and (coll? a) (coll? b)) (into a b)
+    :else b))
+
+(defn- compile-request-uri [request]
+  (if-let [uri (:uri request)]
+    (assoc request :uri `(str ~@uri))
+    request))
+
+(defn- compile-result-match [[route result]]
+  [result (->> route
+               (map route->request)
+               (reduce merge-requests)
+               (compile-request-uri))])
+
+(defn- compile-generate [routes]
+  `(fn [result#]
+     (match result#
+       ~@(mapcat compile-result-match (flatten-routes routes))
+       :else nil)))
 
 (defprotocol Routes
   (-matches [routes request])
   (-generate [routes result]))
 
 (defn compile [routes]
-  (let [routes   (normalize routes)
-        matches  (eval (compile-matches routes))
+  (let [matches  (eval (compile-matches routes))
         generate (eval (compile-generate routes))]
     (reify Routes
       (-matches [_ request] (matches request))
@@ -105,7 +116,6 @@
     (-matches (compile routes) request)))
 
 (defn generate [routes result]
-  (let [result (normalize-result result)]
-    (if (satisfies? Routes routes)
-      (-generate routes result)
-      (-generate (compile routes) result))))
+  (if (satisfies? Routes routes)
+    (-generate routes result)
+    (-generate (compile routes) result)))
