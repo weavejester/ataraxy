@@ -103,12 +103,15 @@
   (-matches [routes request])
   (-generate [routes result]))
 
+(defmacro compile* [routes]
+  `(let [matches#  ~(compile-matches routes)
+         generate# ~(compile-generate routes)]
+     (reify Routes
+       (-matches [_ request#] (matches# request#))
+       (-generate [_ result#] (generate# result#)))))
+
 (defn compile [routes]
-  (let [matches  (eval (compile-matches routes))
-        generate (eval (compile-generate routes))]
-    (reify Routes
-      (-matches [_ request] (matches request))
-      (-generate [_ result] (generate result)))))
+  (eval `(compile* ~routes)))
 
 (defn matches [routes request]
   (if (satisfies? Routes routes)
