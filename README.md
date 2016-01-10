@@ -31,17 +31,14 @@ Add the following dependency to your `project.clj` file:
     [ataraxy "0.1.0-SNAPSHOT"]
 
 
-## Usage
+## Overview
 
-### Static routes
-
-Ataraxy's syntax starts with a map.
+Ataraxy uses a data structure to tell it how to route and destructure
+requests.
 
 ```clojure
 (def routes '{"/foo" [:foo]})
 ```
-
-This maps the static **route** `"/foo"` to the **result**, `[:foo]`.
 
 We can match a request map to a result with `matches`:
 
@@ -57,13 +54,43 @@ And we can generate a request map from a result with `generate`:
 => {:uri "/foo"}
 ```
 
-Note that the generated request map may not be complete.
+Note that the generated request map may not be complete. Ataraxy fills
+in as much as it is able.
 
 
-### Nested routes
+## Syntax
 
-Routes may be arbitrarily nested, by specifying a route map as the
-result, instead of a vector.
+Ataraxy's syntax is known as a **routing map**.
+
+The keys are **routes**, and the data type used defines a way of
+matching and destructuring a request.
+
+The values are either **results** or nested routing maps. Results are
+always vectors, beginning with a keyword.
+
+```
+routing-map = {route (result | routing-map)}
+route       = keyword | map | string | vector
+result      = [keyword & values]
+```
+
+### Strings routes
+
+The simplest form of routes are strings. These match against the
+`:uri` or `:path-info` keys on a Ring request map.
+
+```clojure
+{"/foo" [:foo]
+ "/bar" [:bar]}
+```
+
+This example will match the URIs "/foo" and "/bar".
+
+
+### Nested routing maps
+
+As discussed earlier, routing maps may be arbitrarily nested, by
+specifying a route map as the result, instead of a result vector.
 
 ```clojure
 {"/foo"
@@ -74,16 +101,20 @@ result, instead of a vector.
 This will match the URIs "/foo/bar" and "/foo/baz".
 
 
-### Parameterized routes
+### Vector routes
 
-A vector can be used to construct a parameterized route.
+A vector can be used to construct a parameterized route. Strings in
+the vector are matched verbatim. Symbols match any character that
+isn't "/".
 
 ```clojure
 {["/foo/" id] [:foo id]})
 ```
 
 This will match URIs like "/foo/1" and "/foo/bar". The part of the
-route specified by `id` is carried over to the output:
+route specified by `id` is carried over to the output.
+
+For example:
 
 ```clojure
 (def routes '{["/foo/" id] [:foo id]})
@@ -96,9 +127,9 @@ route specified by `id` is carried over to the output:
 ```
 
 
-### Request methods
+### Keyword routes
 
-A keyword route denotes a request method.
+A keyword route will match the request method.
 
 ```clojure
 {:get [:get-any]})
@@ -116,7 +147,7 @@ such a broad match, a keyword route is often nested:
 This route will match a GET or a POST request to "/foo".
 
 
-### Arbitrary matches
+### Map routes
 
 A map route allows for arbitrary matching and destructuring, using the
 syntax defined in [core.match][].
