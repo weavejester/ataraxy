@@ -31,29 +31,109 @@ Add the following dependency to your `project.clj` file:
     [ataraxy "0.1.0-SNAPSHOT"]
 
 
-## Syntax
+## Usage
+
+### Static routes
 
 Ataraxy's syntax starts with a map.
 
 ```clojure
-{"/foo" [:foo]}
+(def routes '{"/foo" [:foo]})
 ```
 
 This maps the static **route** `"/foo"` to the **result**, `[:foo]`.
 
-We can match a request map (or a partial one) to a result with
-`matches`:
+We can match a request map to a result with `matches`:
 
 ```clojure
-(ataraxy/matches '{"/foo" [:foo]} {:uri "/foo"})
+(ataraxy/matches routes {:uri "/foo"})
 => [:foo]
 ```
 
 And we can generate a request map from a result with `generate`:
 
 ```clojure
-(ataraxy/generate '{"/foo" [:foo]} [:foo])
+(ataraxy/generate routes [:foo])
 => {:uri "/foo"}
+```
+
+Note that the generated request map may not be complete.
+
+
+### Nested routes
+
+Routes may be arbitrarily nested, by specifying a route map as the
+result, instead of a vector.
+
+```clojure
+{"/foo"
+ {"/bar" [:foobar]
+  "/baz" [:foobaz]}})
+```
+
+This will match the URIs "/foo/bar" and "/foo/baz".
+
+
+### Parameterized routes
+
+A vector can be used to construct a parameterized route.
+
+```clojure
+{["/foo/" id] [:foo id]})
+```
+
+This will match URIs like "/foo/1" and "/foo/bar". The part of the
+route specified by `id` is carried over to the output:
+
+```clojure
+(def routes '{["/foo/" id] [:foo id]})
+
+(ataraxy/matches routes {:uri "/foo/123"})
+=> [:foo "123"]
+
+(ataraxy/generate routes [:foo "456"])
+=> {:uri "/foo/456"}
+```
+
+
+### Request methods
+
+A keyword route denotes a request method.
+
+```clojure
+{:get [:get-any]})
+```
+
+This route will match any request with the GET method. Because this is
+such a broad match, a keyword route is often nested:
+
+```clojure
+{"/foo"
+ {:get  [:get-foo]
+  :post [:post-foo]}})
+```
+
+This route will match a GET or a POST request to "/foo".
+
+
+### Arbitrary matches
+
+A map route allows for arbitrary matching and destructuring, using the
+syntax defined in [core.match][].
+
+[core.match]: https://github.com/clojure/core.match
+
+```clojure
+{{:query-params {"q" q}} [:query q]})
+```
+
+This route will match any request with a query parameter named "q". As
+with keyword routes, map routes are often nested:
+
+```clojure
+{"/search"
+ {:get
+  {{:query-params {"q" q}} [:search q]}}})
 ```
 
 
