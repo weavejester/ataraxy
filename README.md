@@ -101,32 +101,6 @@ specifying a route map as the result, instead of a result vector.
 This will match the URIs "/foo/bar" and "/foo/baz".
 
 
-### Vector routes
-
-A vector can be used to construct a parameterized route. Strings in
-the vector are matched verbatim. Symbols match any character that
-isn't "/".
-
-```clojure
-{["/foo/" id] [:foo id]})
-```
-
-This will match URIs like "/foo/1" and "/foo/bar". The part of the
-route specified by `id` is carried over to the output.
-
-For example:
-
-```clojure
-(def routes '{["/foo/" id] [:foo id]})
-
-(ataraxy/matches routes {:uri "/foo/123"})
-=> [:foo "123"]
-
-(ataraxy/generate routes [:foo "456"])
-=> {:uri "/foo/456"}
-```
-
-
 ### Keyword routes
 
 A keyword route will match the request method.
@@ -147,19 +121,60 @@ such a broad match, a keyword route is often nested:
 This route will match a GET or a POST request to "/foo".
 
 
+### Vector routes
+
+A vector can be used to construct a parameterized route. Strings in
+the vector are matched verbatim. Symbols match any character that
+isn't "/". Symbols may be used to carry information from the route to
+the result and vice versa.
+
+```clojure
+{["/foo/" id] [:foo id]})
+```
+
+This will match URIs like "/foo/1" and "/foo/bar". The part of the
+route specified by `id` is carried over to the result.
+
+For example:
+
+```clojure
+(def routes '{["/foo/" id] [:foo id]})
+
+(ataraxy/matches routes {:uri "/foo/123"})
+=> [:foo "123"]
+
+(ataraxy/generate routes [:foo "456"])
+=> {:uri "/foo/456"}
+```
+
+Note that the `id` binding works both ways.
+
+
 ### Map routes
 
 A map route allows for arbitrary matching and destructuring, using the
-syntax defined in [core.match][].
+syntax defined in [core.match][]. As with vector routes, symbols may
+be used to carry information between the route and result.
 
 [core.match]: https://github.com/clojure/core.match
 
 ```clojure
-{{:query-params {"q" q}} [:query q]})
+{{:query-params {"q" q}} [:query q]}
 ```
 
-This route will match any request with a query parameter named "q". As
-with keyword routes, map routes are often nested:
+This route will match any request with a query parameter named "q".
+
+```clojure
+(def routes '{{:query-params {"q" q}} [:query q]})
+
+(ataraxy/matches routes {:query-params {"q" "foo"}})
+=> [:query "foo"]
+
+(ataraxy/generate routes [:query "bar"])
+=> {:query-params {"q" "bar"}}
+```
+
+As with keyword routes, map routes are often nested:
 
 ```clojure
 {"/search"
