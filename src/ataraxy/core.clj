@@ -2,7 +2,18 @@
   (:refer-clojure :exclude [compile])
   (:require [clojure.set :as set]
             [clojure.string :as str]
-            [clojure.core.match :refer [match]]))
+            [clojure.core.match :refer [match]]
+            [miner.herbert :as herbert]))
+
+(def schema
+  '(grammar
+    table
+    route  str
+    result [kw]
+    table  {route (or result table)}))
+
+(defn valid? [routes]
+  (herbert/conforms? schema routes))
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.IPersistentMap ::map)
