@@ -28,7 +28,7 @@ declarative data structure.
 
 Add the following dependency to your `project.clj` file:
 
-    [ataraxy "0.1.0-SNAPSHOT"]
+    [ataraxy "0.0.1"]
 
 
 ## Overview
