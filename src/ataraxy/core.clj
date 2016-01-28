@@ -6,11 +6,11 @@
             [miner.herbert :as herbert]))
 
 (def schema
-  '(grammar
-    table
-    route  str
-    result [kw]
-    table  {route (or result table)}))
+  '(grammar routing-table
+     route-vec     (vec (or str sym))
+     route         (or kw str route-vec)
+     result        [kw sym*]
+     routing-table {route (or result routing-table)}))
 
 (defn valid? [routes]
   (herbert/conforms? schema routes))
