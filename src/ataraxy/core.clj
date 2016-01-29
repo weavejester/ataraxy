@@ -116,6 +116,7 @@
   (-generate [routes result]))
 
 (defmacro compile* [routes]
+  {:pre [(valid? routes)]}
   `(let [matches#  ~(compile-matches routes)
          generate# ~(compile-generate routes)]
      (reify Routes
