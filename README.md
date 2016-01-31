@@ -1,7 +1,8 @@
 # Ataraxy
 
-A **experimental** data-driven routing and destructuring library for
+An **experimental** data-driven routing and destructuring library for
 [Ring][]. Experimental means the syntax should be considered unstable.
+This is not ready for production use.
 
 [ring]: https://github.com/ring-clojure/ring
 
