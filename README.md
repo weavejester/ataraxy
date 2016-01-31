@@ -60,19 +60,27 @@ in as much as it is able.
 
 ## Syntax
 
-Ataraxy's syntax is known as a **routing map**.
+Ataraxy generates routes from a **routing table**, which is a Clojure
+map.
 
-The keys are **routes**, and the data type used defines a way of
-matching and destructuring a request.
+The keys of the map are **routes**, and the data type used defines a
+way of matching and destructuring a request.
 
-The values are either **results** or nested routing maps. Results are
-always vectors, beginning with a keyword.
+The values are either **results** or nested routing tables. Results
+are always vectors, beginning with a keyword.
+
+Here's the formal definition of the syntax:
 
 ```
-routing-map = {route (result | routing-map)}
-route       = keyword | map | string | vector
-result      = [keyword & values]
+routing-table = {route (result | routing-table)}
+
+route         = keyword | string | vector-route | map-route
+result        = [keyword symbol*]
+
+vector-route  = [(string | symbol)+]
+map-route     = {(keyword | string) (symbol | map-route)}
 ```
+
 
 ### Strings routes
 
@@ -87,10 +95,10 @@ The simplest form of routes are strings. These match against the
 This example will match the URIs "/foo" and "/bar".
 
 
-### Nested routing maps
+### Nested routing tables
 
-As discussed earlier, routing maps may be arbitrarily nested, by
-specifying a route map as the result, instead of a result vector.
+As discussed earlier, routing tables may be arbitrarily nested, by
+specifying a map as the result, instead of a vector.
 
 ```clojure
 {"/foo"
@@ -152,9 +160,12 @@ Note that the `id` binding works both ways.
 
 ### Map routes
 
-A map route allows for arbitrary matching and destructuring, using the
-syntax defined in [core.match][]. As with vector routes, symbols may
-be used to carry information between the route and result.
+A map route allows for arbitrary matching and destructuring, using a
+subset of the [core.match][] syntax. Currently only maps, symbols,
+strings and keywords are supported.
+
+As with vector routes, symbols may be used to carry information
+between the route and result.
 
 [core.match]: https://github.com/clojure/core.match
 
