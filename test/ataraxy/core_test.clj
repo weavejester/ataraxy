@@ -5,7 +5,8 @@
 (deftest test-valid?
   (are [x y] (= (ataraxy/valid? x) y)
     '{"/foo" [:bar]} true
-    '{"/foo" :bar}   false))
+    '{"/foo" :bar}   false
+    '{"/foo" (:bar)} false))
 
 (deftest test-matches
   (testing "string routes"

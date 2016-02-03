@@ -10,7 +10,7 @@
      route-map     {(or str kw) (or sym route-map)}
      route-vec     (vec (or str sym))
      route         (or kw str route-vec route-map)
-     result        [kw sym*]
+     result        (vec kw sym*)
      routing-table {route (or result routing-table)}))
 
 (defn valid? [routes]
