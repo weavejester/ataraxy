@@ -8,9 +8,10 @@
 (def schema
   '(grammar routing-table
      regex         (class java.util.regex.Pattern)
-     param-list    (list sym :re (or str regex))
+     binding-list  (list sym :re (or str regex))
+     binding       (or sym binding-list)
      route-map     {(or str kw) (or sym route-map)}
-     route-vec     (vec (or str sym param-list))
+     route-vec     (vec (+ (or str binding)))
      route         (or kw str route-vec route-map)
      result        (vec kw sym*)
      routing-table {route (or result routing-table)}))

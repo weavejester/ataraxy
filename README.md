@@ -78,10 +78,11 @@ routing-table = {route (result | routing-table)}
 route         = keyword | string | vector-route | map-route
 result        = [keyword symbol*]
 
-vector-route  = [(string | symbol | list-param)+]
+vector-route  = [(string | binding)+]
 map-route     = {(keyword | string) (symbol | map-route)}
 
-list-param    = (list symbol :re (string | regex))
+binding       = symbol | list-binding
+list-binding  = (list symbol :re (string | regex))
 ```
 
 
