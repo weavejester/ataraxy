@@ -78,8 +78,10 @@ routing-table = {route (result | routing-table)}
 route         = keyword | string | vector-route | map-route
 result        = [keyword symbol*]
 
-vector-route  = [(string | symbol)+]
+vector-route  = [(string | symbol | list-param)+]
 map-route     = {(keyword | string) (symbol | map-route)}
+
+list-param    = (list symbol :re (string | regex))
 ```
 
 
@@ -157,6 +159,18 @@ For example:
 ```
 
 Note that the `id` binding works both ways.
+
+You can also choose to wrap a symbol in a list to provide more
+information on how it should be matched. The symbol should be the
+first element in the list, followed by a number of keyword
+arguments.
+
+```clojure
+{["/foo/" (id :re #"\d+")] [:foo id]}
+```
+
+This will limit `id` to the supplied regular expression. Currently
+`:re` is the only valid option.
 
 
 ### Map routes

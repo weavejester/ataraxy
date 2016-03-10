@@ -7,8 +7,10 @@
 
 (def schema
   '(grammar routing-table
+     regex         (class java.util.regex.Pattern)
+     param-list    (list sym :re (or str regex))
      route-map     {(or str kw) (or sym route-map)}
-     route-vec     (vec (or str sym))
+     route-vec     (vec (or str sym param-list))
      route         (or kw str route-vec route-map)
      result        (vec kw sym*)
      routing-table {route (or result routing-table)}))
@@ -51,15 +53,22 @@
   (compile-clause state [[route] result]))
 
 (defn- compile-regex-part [value]
-  (if (string? value)
-    (java.util.regex.Pattern/quote value)
-    "([^/]+)"))
+  (cond
+    (list? value)   (str "(" (nth value 2) ")")
+    (string? value) (java.util.regex.Pattern/quote value)
+    (symbol? value) "([^/]+)"))
 
 (defn- compile-regex [route]
   (re-pattern (str (str/join (map compile-regex-part route)) "(.*)")))
 
+(defn- binding-symbol [x]
+  (cond
+    (list? x)   (first x)
+    (string? x) nil
+    (symbol? x) x))
+
 (defn- compile-groups [route path]
-  `[~'_ ~@(filter symbol? route) ~path])
+  `[~'_ ~@(keep binding-symbol route) ~path])
 
 (defmethod compile-clause ::vector [{:keys [path] :as state} [route result]]
   `(if-let [~(compile-groups route path) (re-matches ~(compile-regex route) ~path)]
@@ -84,7 +93,7 @@
 (defn- route->request [route]
   (cond
     (keyword? route) {:request-method route}
-    (vector? route)  {:uri route}
+    (vector? route)  {:uri (mapv #(if (list? %) (first %) %) route)}
     (string? route)  {:uri [route]}
     (map? route)     route))
 

@@ -31,6 +31,14 @@
         {:uri "/foo"}          nil
         {:uri "/foo/44/bar/"}  nil)))
 
+  (testing "custom regexes"
+    (let [routes '{["/foo/" (x :re #"\d\d")] [:foo x]}]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:uri "/foo/10"}     [:foo "10"]
+        {:uri "/foo/1"}      nil
+        {:uri "/foo/bar"}    nil
+        {:uri "/foo/10/bar"} nil)))
+
   (testing "keyword routes"
     (let [routes '{:get [:read], :put [:write]}]
       (are [req res] (= (ataraxy/matches routes req) res)
@@ -76,6 +84,12 @@
         [:foo]             {:uri "/foo"}
         [:foobar "8"]      nil
         [:baz "4" "5"]     nil)))
+
+  (testing "custom regexes"
+    (let [routes '{["/foo/" (x :re #"\d\d")] [:foo x]}]
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:foo "10"] {:uri "/foo/10"}
+        [:bar "10"] nil)))
 
   (testing "keyword routes"
     (let [routes '{:get [:read], :put [:write]}]
