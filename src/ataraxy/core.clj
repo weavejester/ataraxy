@@ -42,7 +42,7 @@
 
 (defn valid? [routes]
   (and (herbert/conforms? schema routes)
-       (not (conflicting-options? (find-bindings routes)))))
+       (not (some (comp conflicting-options? find-bindings) routes))))
 
 (declare compile-conditions)
 
@@ -77,16 +77,17 @@
        ~(compile-result (assoc state :path-matched? true) result))))
 
 (defn- compile-conditions [state routes]
-  `(or ~@(map (partial compile-clause state) routes)))
+  `(or ~@(for [route routes]
+           (compile-clause
+            (assoc state :bindings (find-bindings route))
+            (bindings->symbols route)))))
 
 (defn- compile-matches [routes]
   (let [request (gensym "request")
         path    (gensym "path")]
     `(fn [~request]
        (let [~path (or (:path-info ~request) (:uri ~request))]
-         ~(compile-conditions
-           {:request request, :path path, :bindings (find-bindings routes)}
-           (bindings->symbols routes))))))
+         ~(compile-conditions {:request request, :path path} routes)))))
 
 (defn- flatten-routes [routes]
   (mapcat
