@@ -17,6 +17,11 @@
      result        (vec kw binding*)
      routing-table {route (or result routing-table)}))
 
+(derive clojure.lang.IPersistentVector ::vector)
+(derive clojure.lang.IPersistentMap ::map)
+(derive clojure.lang.Keyword ::keyword)
+(derive java.lang.String ::string)
+
 (defn- index-binding [index binding]
   (if (symbol? binding)
     (update index binding #(or % {}))
@@ -39,27 +44,19 @@
   (and (herbert/conforms? schema routes)
        (not (conflicting-options? (find-bindings routes)))))
 
-(derive clojure.lang.IPersistentVector ::vector)
-(derive clojure.lang.IPersistentMap ::map)
-(derive clojure.lang.Keyword ::keyword)
-(derive java.lang.String ::string)
-
-(defmulti ^:private compile-clause
-  (fn [state route] (type (first route))))
+(declare compile-conditions)
 
 (defmulti ^:private compile-result
   (fn [state result] (type result)))
 
-(defn- compile-conditions [state routes]
-  `(or ~@(map (partial compile-clause state) routes)))
-
 (defmethod compile-result ::vector [{:keys [path path-matched?]} result]
-  (if path-matched?
-    `(if (= ~path "") ~result)
-    result))
+  (if path-matched? `(if (= ~path "") ~result) result))
 
 (defmethod compile-result ::map [state result]
   (compile-conditions state result))
+
+(defmulti ^:private compile-clause
+  (fn [state route] (type (first route))))
 
 (defmethod compile-clause ::keyword [{:keys [request] :as state} [route result]]
   `(if (= (:request-method ~request) ~route)
@@ -73,23 +70,14 @@
 (defmethod compile-clause ::string [state [route result]]
   (compile-clause state [[route] result]))
 
-(defn- compile-regex-part [bindings value]
-  (cond
-    (string? value) (java.util.regex.Pattern/quote value)
-    (symbol? value) (str "(" (-> (bindings value) :re first (or "[^/]+")) ")")))
-
-(defn- compile-regex [bindings route]
-  (let [parts (map (partial compile-regex-part bindings) route)]
-    (re-pattern (str (str/join parts) "(.*)"))))
-
-(defn- compile-groups [route path]
-  `[~'_ ~@(filter symbol? route) ~path])
-
 (defmethod compile-clause ::vector [{:keys [path bindings] :as state} [route result]]
   (let [groups (compile-groups route path)
         regex  (compile-regex bindings route)]
     `(if-let [~groups (re-matches ~regex ~path)]
        ~(compile-result (assoc state :path-matched? true) result))))
+
+(defn- compile-conditions [state routes]
+  `(or ~@(map (partial compile-clause state) routes)))
 
 (defn- compile-matches [routes]
   (let [request (gensym "request")
