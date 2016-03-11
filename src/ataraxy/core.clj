@@ -2,6 +2,7 @@
   (:refer-clojure :exclude [compile])
   (:require [clojure.set :as set]
             [clojure.string :as str]
+            [clojure.walk :as walk]
             [clojure.core.match :refer [match]]
             [miner.herbert :as herbert]))
 
@@ -13,11 +14,30 @@
      route-map     {(or str kw) (or sym route-map)}
      route-vec     (vec (+ (or str binding)))
      route         (or kw str route-vec route-map)
-     result        (vec kw sym*)
+     result        (vec kw binding*)
      routing-table {route (or result routing-table)}))
 
+(defn- index-binding [index binding]
+  (if (symbol? binding)
+    (update index binding #(or % {}))
+    (let [sym  (first binding)
+          opts (partition 2 (rest binding))]
+      (reduce (fn [i [k v]] (update-in i [sym k] (fnil conj #{}) v)) index opts))))
+
+(defn- find-bindings [routes]
+  (->> (tree-seq (some-fn map? vector?) seq routes)
+       (filter (some-fn symbol? list?))
+       (reduce index-binding {})))
+
+(defn- conflicting-options? [bindings]
+  (some next (mapcat vals (vals bindings))))
+
+(defn- bindings->symbols [routes]
+  (walk/postwalk #(if (list? %) (first %) %) routes))
+
 (defn valid? [routes]
-  (herbert/conforms? schema routes))
+  (and (herbert/conforms? schema routes)
+       (not (conflicting-options? (find-bindings routes)))))
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.IPersistentMap ::map)
@@ -43,7 +63,7 @@
 
 (defmethod compile-clause ::keyword [{:keys [request] :as state} [route result]]
   `(if (= (:request-method ~request) ~route)
-     ~(compile-result state result)))
+    ~(compile-result state result)))
 
 (defmethod compile-clause ::map [{:keys [request] :as state} [route result]]
   `(match [~request]
@@ -53,34 +73,32 @@
 (defmethod compile-clause ::string [state [route result]]
   (compile-clause state [[route] result]))
 
-(defn- compile-regex-part [value]
+(defn- compile-regex-part [bindings value]
   (cond
-    (list? value)   (str "(" (nth value 2) ")")
     (string? value) (java.util.regex.Pattern/quote value)
-    (symbol? value) "([^/]+)"))
+    (symbol? value) (str "(" (-> (bindings value) :re first (or "[^/]+")) ")")))
 
-(defn- compile-regex [route]
-  (re-pattern (str (str/join (map compile-regex-part route)) "(.*)")))
-
-(defn- binding-symbol [x]
-  (cond
-    (list? x)   (first x)
-    (string? x) nil
-    (symbol? x) x))
+(defn- compile-regex [bindings route]
+  (let [parts (map (partial compile-regex-part bindings) route)]
+    (re-pattern (str (str/join parts) "(.*)"))))
 
 (defn- compile-groups [route path]
-  `[~'_ ~@(keep binding-symbol route) ~path])
+  `[~'_ ~@(filter symbol? route) ~path])
 
-(defmethod compile-clause ::vector [{:keys [path] :as state} [route result]]
-  `(if-let [~(compile-groups route path) (re-matches ~(compile-regex route) ~path)]
-     ~(compile-result (assoc state :path-matched? true) result)))
+(defmethod compile-clause ::vector [{:keys [path bindings] :as state} [route result]]
+  (let [groups (compile-groups route path)
+        regex  (compile-regex bindings route)]
+    `(if-let [~groups (re-matches ~regex ~path)]
+       ~(compile-result (assoc state :path-matched? true) result))))
 
 (defn- compile-matches [routes]
   (let [request (gensym "request")
         path    (gensym "path")]
     `(fn [~request]
        (let [~path (or (:path-info ~request) (:uri ~request))]
-         ~(compile-conditions {:request request, :path path} routes)))))
+         ~(compile-conditions
+           {:request request, :path path, :bindings (find-bindings routes)}
+           (bindings->symbols routes))))))
 
 (defn- flatten-routes [routes]
   (mapcat
@@ -94,7 +112,7 @@
 (defn- route->request [route]
   (cond
     (keyword? route) {:request-method route}
-    (vector? route)  {:uri (mapv #(if (list? %) (first %) %) route)}
+    (vector? route)  {:uri route}
     (string? route)  {:uri [route]}
     (map? route)     route))
 
@@ -118,7 +136,10 @@
 (defn- compile-generate [routes]
   `(fn [result#]
      (match result#
-       ~@(mapcat compile-result-match (flatten-routes routes))
+       ~@(->> routes
+              (bindings->symbols)
+              (flatten-routes)
+              (mapcat compile-result-match))
        :else nil)))
 
 (defprotocol Routes
