@@ -9,7 +9,7 @@
 (def schema
   '(grammar routing-table
      regex         (class java.util.regex.Pattern)
-     binding-list  (list sym :re (or str regex))
+     binding-list  (list sym (* kw any))
      binding       (or sym binding-list)
      route-map     {(or str kw) (or sym route-map)}
      route-vec     (vec (+ (or str binding)))
