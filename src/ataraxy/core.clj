@@ -70,6 +70,18 @@
 (defmethod compile-clause ::string [state [route result]]
   (compile-clause state [[route] result]))
 
+(defn- compile-regex-part [bindings value]
+  (cond
+    (string? value) (java.util.regex.Pattern/quote value)
+    (symbol? value) (str "(" (-> (bindings value) :re first (or "[^/]+")) ")")))
+
+(defn- compile-regex [bindings route]
+  (let [parts (map (partial compile-regex-part bindings) route)]
+    (re-pattern (str (str/join parts) "(.*)"))))
+
+(defn- compile-groups [route path]
+  `[~'_ ~@(filter symbol? route) ~path])
+
 (defmethod compile-clause ::vector [{:keys [path bindings] :as state} [route result]]
   (let [groups (compile-groups route path)
         regex  (compile-regex bindings route)]
