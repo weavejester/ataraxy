@@ -33,7 +33,7 @@
 
   (testing "custom regexes"
     (let [routes '{["/foo/" (x :re #"\d\d")] [:foo x]
-                   ["/bar/" x] [:bar (x :re #"\d\d\d")]}]
+                   ["/bar/" (x :re #"\d\d\d")] [:bar x]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "/foo/10"}     [:foo "10"]
         {:uri "/foo/1"}      nil

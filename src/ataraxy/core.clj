@@ -22,27 +22,15 @@
 (derive clojure.lang.Keyword ::keyword)
 (derive java.lang.String ::string)
 
-(defn- index-binding [index binding]
-  (if (symbol? binding)
-    (update index binding #(or % {}))
-    (let [sym  (first binding)
-          opts (partition 2 (rest binding))]
-      (reduce (fn [i [k v]] (update-in i [sym k] (fnil conj #{}) v)) index opts))))
-
-(defn- find-bindings [routes]
-  (->> (tree-seq (some-fn map? vector?) seq routes)
-       (filter (some-fn symbol? list?))
-       (reduce index-binding {})))
-
-(defn- conflicting-options? [bindings]
-  (some next (mapcat vals (vals bindings))))
-
 (defn- bindings->symbols [routes]
-  (walk/postwalk #(if (list? %) (first %) %) routes))
+  (walk/postwalk
+   #(if (list? %)
+      (with-meta (first %) (apply hash-map (rest %)))
+      %)
+   routes))
 
 (defn valid? [routes]
-  (and (herbert/conforms? schema routes)
-       (not (some (comp conflicting-options? find-bindings) routes))))
+  (herbert/conforms? schema routes))
 
 (declare compile-conditions)
 
@@ -70,29 +58,26 @@
 (defmethod compile-clause ::string [state [route result]]
   (compile-clause state [[route] result]))
 
-(defn- compile-regex-part [bindings value]
+(defn- compile-regex-part [value]
   (cond
     (string? value) (java.util.regex.Pattern/quote value)
-    (symbol? value) (str "(" (-> (bindings value) :re first (or "[^/]+")) ")")))
+    (symbol? value) (str "(" (:re (meta value) "[^/]+") ")")))
 
-(defn- compile-regex [bindings route]
-  (let [parts (map (partial compile-regex-part bindings) route)]
-    (re-pattern (str (str/join parts) "(.*)"))))
+(defn- compile-regex [route]
+  (re-pattern (str (str/join (map compile-regex-part route)) "(.*)")))
 
 (defn- compile-groups [route path]
   `[~'_ ~@(filter symbol? route) ~path])
 
-(defmethod compile-clause ::vector [{:keys [path bindings] :as state} [route result]]
+(defmethod compile-clause ::vector [{:keys [path] :as state} [route result]]
   (let [groups (compile-groups route path)
-        regex  (compile-regex bindings route)]
+        regex  (compile-regex route)]
     `(if-let [~groups (re-matches ~regex ~path)]
        ~(compile-result (assoc state :path-matched? true) result))))
 
 (defn- compile-conditions [state routes]
   `(or ~@(for [route routes]
-           (compile-clause
-            (assoc state :bindings (find-bindings route))
-            (bindings->symbols route)))))
+           (compile-clause state (bindings->symbols route)))))
 
 (defn- compile-matches [routes]
   (let [request (gensym "request")
