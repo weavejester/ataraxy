@@ -61,7 +61,13 @@
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get, :uri "/foo"}    [:foo]
         {:request-method :get, :uri "/foo/10"} [:foo "10"]
-        {:uri "/foo"}                          nil))))
+        {:uri "/foo"}                          nil)))
+
+  (testing "types"
+    (let [routes '{["/foo/" id] [:foo (id :tag UUID)]}
+          id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:uri (str "/foo/" id)} [:foo id]))))
 
 (deftest test-generate
   (testing "static routes"

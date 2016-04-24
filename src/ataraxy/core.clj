@@ -1,10 +1,20 @@
 (ns ataraxy.core
   (:refer-clojure :exclude [compile])
+  (:import java.util.UUID)
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [clojure.walk :as walk]
             [clojure.core.match :refer [match]]
             [miner.herbert :as herbert]))
+
+(defmulti coerce
+  (fn [from to] [(type from) to]))
+
+(defmethod coerce [String 'UUID] [x _]
+  (UUID/fromString x))
+
+(defmethod coerce [UUID 'String] [x _]
+  (str x))
 
 (def schema
   '(grammar routing-table
@@ -37,8 +47,17 @@
 (defmulti ^:private compile-result
   (fn [state result] (type result)))
 
+(defn- coerce-symbol [x]
+  (if (and (symbol? x) (:tag (meta x)))
+    `(coerce ~x '~(:tag (meta x)))
+    x))
+
 (defmethod compile-result ::vector [{:keys [path path-matched?]} result]
-  (if path-matched? `(if (= ~path "") ~result) result))
+  (let [[kw & args] result
+        result'     (into [kw] (map coerce-symbol) args)]
+    (if path-matched?
+      `(if (= ~path "") ~result')
+      result')))
 
 (defmethod compile-result ::map [state result]
   (compile-conditions state result))
