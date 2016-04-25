@@ -32,8 +32,8 @@
         {:uri "/foo/44/bar/"}  nil)))
 
   (testing "custom regexes"
-    (let [routes '{["/foo/" (x :re #"\d\d")] [:foo x]
-                   ["/bar/" (x :re #"\d\d\d")] [:bar x]}]
+    (let [routes '{["/foo/" (x :re #"\d\d")]    [:foo x]
+                   ["/bar/" ^{:re #"\d\d\d"} x] [:bar x]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "/foo/10"}     [:foo "10"]
         {:uri "/foo/1"}      nil
@@ -64,10 +64,12 @@
         {:uri "/foo"}                          nil)))
 
   (testing "types"
-    (let [routes '{["/foo/" id] [:foo (id :tag UUID)]}
+    (let [routes '{["/foo/" id] [:foo (id :tag UUID)]
+                   ["/bar/" id] [:bar ^UUID id]}
           id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
       (are [req res] (= (ataraxy/matches routes req) res)
-        {:uri (str "/foo/" id)} [:foo id]))))
+        {:uri (str "/foo/" id)} [:foo id]
+        {:uri (str "/bar/" id)} [:bar id]))))
 
 (deftest test-generate
   (testing "static routes"
