@@ -10,20 +10,14 @@
 (defmulti coerce
   (fn [from to] [(type from) to]))
 
-(defmethod coerce [String 'UUID] [x _]
-  (UUID/fromString x))
-
-(defmethod coerce [UUID 'String] [x _]
-  (str x))
+(defmethod coerce [String 'UUID] [x _] (UUID/fromString x))
+(defmethod coerce [UUID 'String] [x _] (str x))
 
 (defmulti check
   (fn [x type] type))
 
-(defmethod check 'UUID [x _]
-  (instance? UUID x))
-
-(defmethod check 'String [x _]
-  (string? x))
+(defmethod check 'UUID   [x _] (instance? UUID x))
+(defmethod check 'String [x _] (string? x))
 
 (def schema
   '(grammar routing-table
