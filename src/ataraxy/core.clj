@@ -10,8 +10,10 @@
 (defmulti coerce
   (fn [from to] [(type from) to]))
 
-(defmethod coerce [String 'UUID] [x _] (UUID/fromString x))
-(defmethod coerce [UUID 'String] [x _] (str x))
+(defmethod coerce [String 'UUID]   [x _] (UUID/fromString x))
+(defmethod coerce [UUID 'String]   [x _] (str x))
+(defmethod coerce [String 'String] [x _] x)
+(defmethod coerce [UUID 'UUID]     [x _] x)
 
 (defmulti check
   (fn [x type] type))
@@ -50,10 +52,18 @@
 (defmulti ^:private compile-result
   (fn [state result] (type result)))
 
-(defn- coerce-symbol [x]
-  (if (and (symbol? x) (:tag (meta x)))
-    `(coerce ~x '~(:tag (meta x)))
-    x))
+(defn- coerce-symbol
+  ([x]
+   (let [tag (:tag (meta x))]
+     (if (and (symbol? x) tag)
+       `(coerce ~x '~tag)
+       x)))
+  ([x default-tag]
+   (if (symbol? x)
+     (if-let [tag (:tag (meta x))]
+       `(coerce ~x '~tag)
+       `(coerce ~x '~default-tag))
+     x)))
 
 (defmethod compile-result ::vector [{:keys [path path-matched?]} [kw & args]]
   (let [result (into [kw] (map coerce-symbol) args)]
@@ -119,9 +129,9 @@
 (defn- route->request [route]
   (cond
     (keyword? route) {:request-method route}
-    (vector? route)  {:uri route}
+    (vector? route)  {:uri (mapv #(coerce-symbol % 'String) route)}
     (string? route)  {:uri [route]}
-    (map? route)     route))
+    (map? route)     (walk/postwalk #(coerce-symbol %) route)))
 
 (defn- merge-requests [a b]
   (cond
