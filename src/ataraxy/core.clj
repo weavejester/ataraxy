@@ -16,6 +16,15 @@
 (defmethod coerce [UUID 'String] [x _]
   (str x))
 
+(defmulti check
+  (fn [x type] type))
+
+(defmethod check 'UUID [x _]
+  (instance? UUID x))
+
+(defmethod check 'String [x _]
+  (string? x))
+
 (def schema
   '(grammar routing-table
      regex         (class java.util.regex.Pattern)
@@ -132,11 +141,17 @@
     (assoc request :uri `(str ~@uri))
     request))
 
-(defn- compile-result-match [[route result]]
-  [result (->> route
-               (map route->request)
-               (reduce merge-requests)
-               (compile-request-uri))])
+(defn- guard-symbol [s]
+  (if (and (symbol? s) (:tag (meta s)))
+    `(~s :guard #(check % '~(:tag (meta s))))
+    s))
+
+(defn- compile-result-match [[route [kw & args]]]
+  [(into [kw] (map guard-symbol) args)
+   (->> route
+        (map route->request)
+        (reduce merge-requests)
+        (compile-request-uri))])
 
 (defn- compile-generate [routes]
   `(fn [result#]

@@ -122,4 +122,14 @@
         [:foo]           {:request-method :get, :uri "/foo"}
         [:foo "10"]      {:request-method :get, :uri "/foo/10"}
         [:foo "10" "20"] nil
-        [:bar "10"]      nil))))
+        [:bar "10"]      nil)))
+
+  (testing "types"
+    (let [routes '{["/foo/" id] [:foo (id :tag UUID)]
+                   ["/bar/" id] [:bar ^UUID id]}
+          id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
+      (are [res req] (= (ataraxy/generate routes res) req)
+        [:foo id]       {:uri (str "/foo/" id)}
+        [:bar id]       {:uri (str "/bar/" id)}
+        [:bar "x"]      nil
+        [:bar (str id)] nil))))
