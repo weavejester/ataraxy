@@ -61,12 +61,11 @@
     `(coerce ~x '~(:tag (meta x)))
     x))
 
-(defmethod compile-result ::vector [{:keys [path path-matched?]} result]
-  (let [[kw & args] result
-        result'     (into [kw] (map coerce-symbol) args)]
+(defmethod compile-result ::vector [{:keys [path path-matched?]} [kw & args]]
+  (let [result (into [kw] (map coerce-symbol) args)]
     (if path-matched?
-      `(if (= ~path "") ~result')
-      result')))
+      `(if (= ~path "") ~result)
+      result)))
 
 (defmethod compile-result ::map [state result]
   (compile-conditions state result))
