@@ -10,16 +10,20 @@
 (defmulti coerce
   (fn [from to] [(type from) to]))
 
+(defmethod coerce [String 'Int] [x _]
+  (try (Long/parseLong x) (catch NumberFormatException _)))
+
 (defmethod coerce [String 'UUID] [x _]
   (try (UUID/fromString x) (catch IllegalArgumentException _)))
 
-(defmethod coerce [UUID 'String]   [x _] (str x))
+(defmethod coerce [Number 'String] [x _] (str x))
+(defmethod coerce [UUID   'String] [x _] (str x))
 (defmethod coerce [String 'String] [x _] x)
-(defmethod coerce [UUID 'UUID]     [x _] x)
 
 (defmulti check
   (fn [x type] type))
 
+(defmethod check 'Int    [x _] (integer? x))
 (defmethod check 'UUID   [x _] (instance? UUID x))
 (defmethod check 'String [x _] (string? x))
 
