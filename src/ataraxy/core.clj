@@ -131,7 +131,7 @@
     (keyword? route) {:request-method route}
     (vector? route)  {:uri (mapv #(coerce-symbol % 'String) route)}
     (string? route)  {:uri [route]}
-    (map? route)     (walk/postwalk #(coerce-symbol %) route)))
+    (map? route)     (walk/postwalk coerce-symbol route)))
 
 (defn- merge-requests [a b]
   (cond
