@@ -65,7 +65,7 @@
 
   (testing "types"
     (let [routes '{["/foo/" id] [:foo (id :tag UUID)]
-                   ["/bar/" id] [:bar ^UUID id]
+                   ["/bar/" id] [:bar (id :- UUID)]
                    ["/baz/" id] [:baz ^Int id]}
           id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
       (are [req res] (= (ataraxy/matches routes req) res)

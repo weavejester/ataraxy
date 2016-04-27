@@ -43,10 +43,14 @@
 (derive clojure.lang.Keyword ::keyword)
 (derive java.lang.String ::string)
 
+(defn- build-metadata [keyvals]
+  (let [m (apply hash-map keyvals)]
+    (cond-> m (:- m) (assoc :tag (:- m)))))
+
 (defn- bindings->symbols [routes]
   (walk/postwalk
    #(if (list? %)
-      (with-meta (first %) (apply hash-map (rest %)))
+      (with-meta (first %) (build-metadata (rest %)))
       %)
    routes))
 
