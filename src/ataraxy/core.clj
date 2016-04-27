@@ -10,7 +10,9 @@
 (defmulti coerce
   (fn [from to] [(type from) to]))
 
-(defmethod coerce [String 'UUID]   [x _] (UUID/fromString x))
+(defmethod coerce [String 'UUID] [x _]
+  (try (UUID/fromString x) (catch IllegalArgumentException _)))
+
 (defmethod coerce [UUID 'String]   [x _] (str x))
 (defmethod coerce [String 'String] [x _] x)
 (defmethod coerce [UUID 'UUID]     [x _] x)
@@ -66,7 +68,10 @@
      x)))
 
 (defmethod compile-result ::vector [{:keys [path path-matched?]} [kw & args]]
-  (let [result (into [kw] (map coerce-symbol) args)]
+  (let [symbols (map gensym args)
+        result  `(let [~@(interleave symbols (map coerce-symbol args))]
+                   (if (and ~@symbols)
+                     [~kw ~@symbols]))]
     (if path-matched?
       `(if (= ~path "") ~result)
       result)))

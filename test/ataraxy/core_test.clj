@@ -69,7 +69,9 @@
           id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri (str "/foo/" id)} [:foo id]
-        {:uri (str "/bar/" id)} [:bar id]))))
+        {:uri (str "/bar/" id)} [:bar id]
+        {:uri "/foo/8b82e52d"}  nil
+        {:uri "/bar/10"}        nil))))
 
 (deftest test-generate
   (testing "static routes"
