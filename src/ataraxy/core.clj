@@ -13,6 +13,9 @@
 (defmethod coerce [String 'Int] [x _]
   (try (Long/parseLong x) (catch NumberFormatException _)))
 
+(defmethod coerce [String 'Nat] [x _]
+  (if-let [x (coerce x 'Int)] (if (>= x 0) x)))
+
 (defmethod coerce [String 'UUID] [x _]
   (try (UUID/fromString x) (catch IllegalArgumentException _)))
 
@@ -24,6 +27,7 @@
   (fn [x type] type))
 
 (defmethod check 'Int    [x _] (integer? x))
+(defmethod check 'Nat    [x _] (and (integer? x) (>= x 0)))
 (defmethod check 'UUID   [x _] (instance? UUID x))
 (defmethod check 'String [x _] (string? x))
 
