@@ -29,7 +29,7 @@ declarative data structure.
 
 Add the following dependency to your `project.clj` file:
 
-    [ataraxy "0.0.3"]
+    [ataraxy "0.0.4"]
 
 
 ## Overview
