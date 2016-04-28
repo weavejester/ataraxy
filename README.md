@@ -82,7 +82,7 @@ vector-route  = [(string | binding)+]
 map-route     = {(keyword | string) (symbol | map-route)}
 
 binding       = symbol | list-binding
-list-binding  = (list symbol :re (string | regex))
+list-binding  = (list symbol (keyword | any-value)+)
 ```
 
 
@@ -161,17 +161,13 @@ For example:
 
 Note that the `id` binding works both ways.
 
-You can also choose to wrap a symbol in a list to provide more
-information on how it should be matched. The symbol should be the
-first element in the list, followed by a number of keyword
-arguments.
+You can also choose to add metadata to the binding symbol. The `:re`
+key may be used to restrict a symbol to match a specific regular
+expression.
 
 ```clojure
-{["/foo/" (id :re #"\d+")] [:foo id]}
+{["/foo/" ^{:re #"\d+"} id] [:foo id]}
 ```
-
-This will limit `id` to the supplied regular expression. Currently
-`:re` is the only valid option.
 
 
 ### Map routes
@@ -207,6 +203,75 @@ As with keyword routes, map routes are often nested:
 {"/search"
  {:get
   {{:query-params {"q" q}} [:search q]}}})
+```
+
+
+### Coercion
+
+Data from the request can also be coerced into different types. If you
+tag a symbol in the result vector, Ataraxy will attempt to coerce the
+data into the type denoted by the tag.
+
+In the example below, the `id` symbol will be coerced into a UUID:
+
+```clojure
+{["/foo/" id] [:foo ^UUID id]}
+```
+
+If the coercion cannot be matched, the route will fail and Ataraxy
+will move onto the next route.
+
+There are three coercions by default in Ataraxy:
+
+* `UUID` - coerce into a UUID object
+* `Int`  - coerce into an integer
+* `Nat`  - coerce into an integer greater than or equal to zero
+
+To create a new coercion, you'll need to add methods for the `coerce`
+and `check` multimethods. The `coerce` multimethod coerces a value
+into the type denoted by the tag symbol. If this cannot be done, `nil`
+should be returned instead:
+
+```clojure
+(defmethod coerce [String 'Int] [x _]
+  (try (Long/parseLong x) (catch NumberFormatException _)))
+```
+
+The `check` multimethod determines whether a value matches the type
+denoted by the tag symbol:
+
+```clojure
+(defmethod check 'Int [x _] (integer? x))
+```
+
+
+### Metadata
+
+Ataraxy supports defining routes in both [edn][] and Clojure. Since
+edn lacks syntax for metadata, lists are used instead.
+
+[edn]: https://github.com/edn-format/edn
+
+So in Clojure metadata can be attached to a symbol as usual:
+
+```clojure
+^{:re #"\d+"} id
+```
+
+Whereas in edn:
+
+```edn
+(id :re "\\d+")
+```
+
+Ataraxy also supports using `:-` as a shortcut for `:tag`. The
+following statements are all equivalent:
+
+```clojure
+^Int id
+^{:tag Int} id
+(id :- Int)
+(id :tag Int)
 ```
 
 
