@@ -1,5 +1,7 @@
 # Ataraxy
 
+[![Build Status](https://travis-ci.org/weavejester/ataraxy.svg?branch=master)](https://travis-ci.org/weavejester/ataraxy)
+
 An **experimental** data-driven routing and destructuring library for
 [Ring][]. Experimental means the syntax should be considered unstable.
 This is not ready for production use.
