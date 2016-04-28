@@ -68,16 +68,12 @@
 
 (defn- coerce-symbol
   ([x]
-   (let [tag (:tag (meta x))]
-     (if (and (symbol? x) tag)
-       `(coerce ~x '~tag)
-       x)))
+   (coerce-symbol x nil))
   ([x default-tag]
-   (if (symbol? x)
-     (if-let [tag (:tag (meta x))]
-       `(coerce ~x '~tag)
-       `(coerce ~x '~default-tag))
-     x)))
+   (cond
+     (and (symbol? x) (:tag (meta x))) `(coerce ~x '~(:tag (meta x)))
+     (and (symbol? x) default-tag)     `(coerce ~x '~default-tag)
+     :else x)))
 
 (defmethod compile-result ::vector [{:keys [path path-matched?]} [kw & args]]
   (let [symbols (map gensym args)
