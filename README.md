@@ -103,6 +103,10 @@ binding       = symbol | list-binding
 list-binding  = (list symbol (keyword | any-value)+)
 ```
 
+If Ataraxy cannot find a matching route, `nil` will be
+returned. **This behavior will be changed in future** in order to
+support more informative failure messages.
+
 
 ### Strings routes
 
