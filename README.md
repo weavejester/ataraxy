@@ -60,6 +60,22 @@ And we can generate a request map from a result with `generate`:
 Note that the generated request map may not be complete. Ataraxy fills
 in as much as it is able.
 
+For performance, we can also pre-compile the routing data:
+
+```clojure
+(def compiled-routes (ataraxy/compile routes))
+```
+
+The resulting object can be used in `matches` and `routes` in the same
+way as the raw data structure:
+
+```clojure
+(ataraxy/matches compiled-routes {:uri "/foo"})
+=> [:foo]
+(ataraxy/generate compiled-routes [:foo])
+=> {:uri "/foo"}
+```
+
 
 ## Syntax
 
