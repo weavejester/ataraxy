@@ -60,6 +60,10 @@ And we can generate a request map from a result with `generate`:
 Note that the generated request map may not be complete. Ataraxy fills
 in as much as it is able.
 
+If Ataraxy cannot find a matching route or result, then `nil` will be
+returned. **This behavior may be changed in future** in order to
+support more informative failure messages.
+
 For performance, we can also pre-compile the routing data:
 
 ```clojure
@@ -102,10 +106,6 @@ map-route     = {(keyword | string) (symbol | map-route)}
 binding       = symbol | list-binding
 list-binding  = (list symbol (keyword | any-value)+)
 ```
-
-If Ataraxy cannot find a matching route, `nil` will be
-returned. **This behavior will be changed in future** in order to
-support more informative failure messages.
 
 
 ### Strings routes
