@@ -13,7 +13,7 @@ An **experimental** data-driven routing and destructuring library for
 There are several data-driven routing libraries for Ring, such as
 [bidi][], [Silk][] and [gudu][]. Ataraxy differs from them because
 it not only seeks to match a route, it also destructures the
-incoming request.
+incoming request and provides data coercion.
 
 In this sense it is similar to [Compojure][], in that the idea is to
 remove extraneous information. However, while Compojure is designed to
