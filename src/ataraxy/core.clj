@@ -2,10 +2,10 @@
   (:refer-clojure :exclude [compile])
   (:import java.util.UUID)
   (:require [clojure.set :as set]
+            [clojure.spec :as s]
             [clojure.string :as str]
             [clojure.walk :as walk]
-            [clojure.core.match :refer [match]]
-            [miner.herbert :as herbert]))
+            [clojure.core.match :refer [match]]))
 
 (defmulti coerce
   (fn [from to] [(type from) to]))
@@ -31,16 +31,30 @@
 (defmethod check 'UUID   [x _] (instance? UUID x))
 (defmethod check 'String [x _] (string? x))
 
-(def schema
-  '(grammar routing-table
-     regex         (class java.util.regex.Pattern)
-     binding-list  (list sym (* kw any))
-     binding       (or sym binding-list)
-     route-map     {(or str kw) (or sym route-map)}
-     route-vec     (vec (+ (or str binding)))
-     route         (or kw str route-vec route-map)
-     result        (vec kw binding*)
-     routing-table {route (or result routing-table)}))
+(s/def ::binding-list
+  (s/cat :symbol symbol? :options (s/* (s/cat :key keyword? :val any?))))
+
+(s/def ::binding
+  (s/or :symbol symbol? :binding-list ::binding-list))
+
+(s/def ::route-map
+  (s/map-of (s/or :string string? :keyword keyword?)
+            (s/or :symbol symbol? :route-map ::route-map)))
+
+(s/def ::route-vector
+  (s/and vector? (s/+ (s/or :string string? :binding ::binding))))
+
+(s/def ::route
+  (s/or :keyword      keyword?
+        :string       string?
+        :route-vector ::route-vector
+        :route-map    ::route-map))
+
+(s/def ::result
+  (s/and vector? (s/cat :name keyword? :bindings (s/* ::binding))))
+
+(s/def ::routing-table
+  (s/map-of ::route (s/or :result ::result :sub-routes ::routing-table)))
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.IPersistentMap ::map)
@@ -59,7 +73,7 @@
    routes))
 
 (defn valid? [routes]
-  (herbert/conforms? schema routes))
+  (s/valid? ::routing-table routes))
 
 (declare compile-conditions)
 
