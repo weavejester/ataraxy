@@ -52,7 +52,8 @@
          :result (s/or :result ::result :routes ::routing-table)))
 
 (s/def ::routing-table
-  (s/and map? (s/* (s/spec ::route-result))))
+  (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
+        :ordered   (s/and list? (s/* ::route-result))))
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.IPersistentMap ::map)
