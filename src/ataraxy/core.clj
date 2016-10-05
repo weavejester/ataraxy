@@ -31,6 +31,9 @@
 (defmethod check 'UUID   [x _] (instance? UUID x))
 (defmethod check 'String [x _] (string? x))
 
+(s/def ::route-set
+  (s/and set? (s/coll-of symbol?)))
+
 (s/def ::route-map
   (s/map-of (s/or :string string? :keyword keyword?)
             (s/or :symbol symbol? :route-map ::route-map)))
@@ -39,10 +42,11 @@
   (s/or :keyword keyword?
         :string  string?
         :symbol  symbol?
+        :set     ::route-set
         :map     ::route-map))
 
 (s/def ::route-multiple
-  (s/and vector? (s/+ ::route-single)))
+  (s/and vector? (s/coll-of ::route-single)))
 
 (s/def ::route
   (s/or :single   ::route-single
