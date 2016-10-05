@@ -36,7 +36,7 @@
             (s/or :symbol symbol? :route-map ::route-map)))
 
 (s/def ::route-vector
-  (s/and vector? (s/+ (s/or :string string? :binding symbol?))))
+  (s/and vector? (s/+ (s/or :string string? :symbol symbol?))))
 
 (s/def ::route
   (s/or :keyword keyword?
@@ -45,10 +45,14 @@
         :map     ::route-map))
 
 (s/def ::result
-  (s/and vector? (s/cat :name keyword? :bindings (s/* symbol?))))
+  (s/and vector? (s/cat :key keyword? :args (s/* symbol?))))
+
+(s/def ::route-result
+  (s/cat :route  ::route
+         :result (s/or :result ::result :routes ::routing-table)))
 
 (s/def ::routing-table
-  (s/map-of ::route (s/or :result ::result :sub-routes ::routing-table)))
+  (s/and map? (s/* (s/spec ::route-result))))
 
 (derive clojure.lang.IPersistentVector ::vector)
 (derive clojure.lang.IPersistentMap ::map)
