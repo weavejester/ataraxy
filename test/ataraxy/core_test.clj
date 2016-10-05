@@ -32,7 +32,7 @@
         {:uri "/foo/44/bar/"}  nil)))
 
   (testing "custom regexes"
-    (let [routes '{["/foo/" (x :re #"\d\d")]    [:foo x]
+    (let [routes '{["/foo/" ^{:re #"\d\d"} x]   [:foo x]
                    ["/bar/" ^{:re #"\d\d\d"} x] [:bar x]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "/foo/10"}     [:foo "10"]
@@ -64,21 +64,19 @@
         {:uri "/foo"}                          nil)))
 
   (testing "types"
-    (let [routes '{["/foo/" id] [:foo (id :tag UUID)]
-                   ["/bar/" id] [:bar (id :- UUID)]
-                   ["/baz/" id] [:baz ^Int id]
-                   ["/quz/" id] [:quz ^Nat id]}
+    (let [routes '{["/foo/" id] [:foo ^UUID id]
+                   ["/bar/" id] [:bar ^Int id]
+                   ["/baz/" id] [:baz ^Nat id]}
           id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri (str "/foo/" id)} [:foo id]
-        {:uri (str "/bar/" id)} [:bar id]
+        {:uri "/bar/10"}        [:bar 10]
+        {:uri "/bar/-10"}       [:bar -10]
         {:uri "/baz/10"}        [:baz 10]
-        {:uri "/baz/-10"}       [:baz -10]
-        {:uri "/quz/10"}        [:quz 10]
         {:uri "/foo/8b82e52d"}  nil
-        {:uri "/bar/10"}        nil
-        {:uri "/baz/xx"}        nil
-        {:uri "/quz/-10"}       nil))))
+        {:uri "/foo/10"}        nil
+        {:uri "/bar/xx"}        nil
+        {:uri "/baz/-10"}       nil))))
 
 (deftest test-generate
   (testing "static routes"
@@ -106,7 +104,7 @@
         [:baz "4" "5"]     nil)))
 
   (testing "custom regexes"
-    (let [routes '{["/foo/" (x :re #"\d\d")] [:foo x]}]
+    (let [routes '{["/foo/" ^{:re #"\d\d"} x] [:foo x]}]
       (are [res req] (= (ataraxy/generate routes res) req)
         [:foo "10"] {:uri "/foo/10"}
         [:bar "10"] nil)))
@@ -134,17 +132,15 @@
         [:bar "10"]      nil)))
 
   (testing "types"
-    (let [routes '{["/foo/" id] [:foo (id :tag UUID)]
-                   ["/bar/" id] [:bar (id :- UUID)]
-                   ["/baz/" id] [:baz ^Int id]
-                   ["/quz/" id] [:quz ^Nat id]}
+    (let [routes '{["/foo/" id] [:foo ^UUID id]
+                   ["/bar/" id] [:bar ^Int id]
+                   ["/baz/" id] [:baz ^Nat id]}
           id     #uuid "8b82e52d-3c9f-44b8-8342-dfc29ca1c471"]
       (are [res req] (= (ataraxy/generate routes res) req)
         [:foo id]       {:uri (str "/foo/" id)}
-        [:bar id]       {:uri (str "/bar/" id)}
-        [:baz 10]       {:uri "/baz/10"}
-        [:baz -10]      {:uri "/baz/-10"}
-        [:quz 9]        {:uri "/quz/9"}
-        [:bar "x"]      nil
-        [:bar (str id)] nil
-        [:quz -3]       nil))))
+        [:bar 10]       {:uri "/bar/10"}
+        [:bar -10]      {:uri "/bar/-10"}
+        [:baz 9]        {:uri "/baz/9"}
+        [:foo "x"]      nil
+        [:foo (str id)] nil
+        [:baz -3]       nil))))

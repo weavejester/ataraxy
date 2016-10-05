@@ -31,27 +31,21 @@
 (defmethod check 'UUID   [x _] (instance? UUID x))
 (defmethod check 'String [x _] (string? x))
 
-(s/def ::binding-list
-  (s/cat :symbol symbol? :options (s/* (s/cat :key keyword? :val any?))))
-
-(s/def ::binding
-  (s/or :symbol symbol? :binding-list ::binding-list))
-
 (s/def ::route-map
   (s/map-of (s/or :string string? :keyword keyword?)
             (s/or :symbol symbol? :route-map ::route-map)))
 
 (s/def ::route-vector
-  (s/and vector? (s/+ (s/or :string string? :binding ::binding))))
+  (s/and vector? (s/+ (s/or :string string? :binding symbol?))))
 
 (s/def ::route
-  (s/or :keyword      keyword?
-        :string       string?
-        :route-vector ::route-vector
-        :route-map    ::route-map))
+  (s/or :keyword keyword?
+        :string  string?
+        :vector  ::route-vector
+        :map     ::route-map))
 
 (s/def ::result
-  (s/and vector? (s/cat :name keyword? :bindings (s/* ::binding))))
+  (s/and vector? (s/cat :name keyword? :bindings (s/* symbol?))))
 
 (s/def ::routing-table
   (s/map-of ::route (s/or :result ::result :sub-routes ::routing-table)))
@@ -60,17 +54,6 @@
 (derive clojure.lang.IPersistentMap ::map)
 (derive clojure.lang.Keyword ::keyword)
 (derive java.lang.String ::string)
-
-(defn- build-metadata [keyvals]
-  (let [m (apply hash-map keyvals)]
-    (cond-> m (:- m) (assoc :tag (:- m)))))
-
-(defn- bindings->symbols [routes]
-  (walk/postwalk
-   #(if (list? %)
-      (with-meta (first %) (build-metadata (rest %)))
-      %)
-   routes))
 
 (defn valid? [routes]
   (s/valid? ::routing-table routes))
@@ -134,8 +117,7 @@
        ~(compile-result (assoc state :path-matched? true) result))))
 
 (defn- compile-conditions [state routes]
-  `(or ~@(for [route routes]
-           (compile-clause state (bindings->symbols route)))))
+  `(or ~@(for [route routes] (compile-clause state route))))
 
 (defn- compile-matches [routes]
   (let [request (gensym "request")
@@ -186,10 +168,7 @@
 (defn- compile-generate [routes]
   `(fn [result#]
      (match result#
-       ~@(->> routes
-              (bindings->symbols)
-              (flatten-routes)
-              (mapcat compile-result-match))
+       ~@(mapcat compile-result-match (flatten-routes routes))
        :else nil)))
 
 (defprotocol Routes
