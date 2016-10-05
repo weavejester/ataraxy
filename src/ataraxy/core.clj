@@ -35,14 +35,18 @@
   (s/map-of (s/or :string string? :keyword keyword?)
             (s/or :symbol symbol? :route-map ::route-map)))
 
-(s/def ::route-vector
-  (s/and vector? (s/+ (s/or :string string? :symbol symbol?))))
-
-(s/def ::route
+(s/def ::route-single
   (s/or :keyword keyword?
         :string  string?
-        :vector  ::route-vector
+        :symbol  symbol?
         :map     ::route-map))
+
+(s/def ::route-multiple
+  (s/and vector? (s/+ ::route-single)))
+
+(s/def ::route
+  (s/or :single   ::route-single
+        :multiple ::route-multiple))
 
 (s/def ::result
   (s/and vector? (s/cat :key keyword? :args (s/* symbol?))))
