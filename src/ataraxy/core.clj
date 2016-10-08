@@ -34,16 +34,12 @@
 (s/def ::route-set
   (s/and set? (s/coll-of symbol?)))
 
-(s/def ::route-map
-  (s/map-of (s/or :string string? :keyword keyword?)
-            (s/or :symbol symbol? :route-map ::route-map)))
-
 (s/def ::route-single
   (s/or :keyword keyword?
         :string  string?
         :symbol  symbol?
-        :set     ::route-set
-        :map     ::route-map))
+        :map     map?
+        :set     ::route-set))
 
 (s/def ::route-multiple
   (s/and vector? (s/coll-of ::route-single)))
@@ -63,18 +59,8 @@
   (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
         :ordered   (s/and list? (s/* ::route-result))))
 
-(derive clojure.lang.IPersistentVector ::vector)
-(derive clojure.lang.IPersistentMap ::map)
-(derive clojure.lang.Keyword ::keyword)
-(derive java.lang.String ::string)
-
 (defn valid? [routes]
   (s/valid? ::routing-table routes))
-
-(declare compile-conditions)
-
-(defmulti ^:private compile-result
-  (fn [state result] (type result)))
 
 (defn- coerce-symbol
   ([x]
@@ -85,59 +71,68 @@
      (and (symbol? x) default-tag)     `(coerce ~x '~default-tag)
      :else x)))
 
-(defmethod compile-result ::vector [{:keys [path path-matched?]} [kw & args]]
-  (let [symbols (map gensym args)
-        result  `(let [~@(interleave symbols (map coerce-symbol args))]
-                   (if (and ~@symbols)
-                     [~kw ~@symbols]))]
-    (if path-matched?
-      `(if (= ~path "") ~result)
-      result)))
+(defn- compile-result-vector
+  ([{:keys [path-matched? path]} key]
+   (if path-matched?
+    `(if (= ~path "") [~key])
+    [key]))
+  ([{:keys [path-matched? path]} key args]
+   (let [symbols (map gensym args)]
+     `(let [~@(interleave symbols (map coerce-symbol args))]
+        (if (and ~@(if path-matched? [`(= ~path "")]) ~@symbols)
+          [~key ~@symbols])))))
 
-(defmethod compile-result ::map [state result]
-  (compile-conditions state result))
+(declare compile-routing-table)
 
-(defmulti ^:private compile-clause
-  (fn [state route] (type (first route))))
+(defn- compile-result [{:keys [path path-matched?] :as state} result]
+  (match result
+    [:result {:key k :args as}] (compile-result-vector state k as)
+    [:result {:key k}]          (compile-result-vector state k)
+    [:routes r]                 (compile-routing-table state r)))
 
-(defmethod compile-clause ::keyword [{:keys [request] :as state} [route result]]
-  `(if (= (:request-method ~request) ~route)
-    ~(compile-result state result)))
+(declare compile-routes)
 
-(defmethod compile-clause ::map [{:keys [request] :as state} [route result]]
-  `(match [~request]
-     [~route] ~(compile-result state result)
-     :else  nil))
+(defmulti ^:private compile-route-part
+  (fn [state route result] (first route)))
 
-(defmethod compile-clause ::string [state [route result]]
-  (compile-clause state [[route] result]))
+(defmethod compile-route-part :keyword [{:keys [request] :as state} [_ kw] cont]
+  `(if (= (:request-method ~request) ~kw)
+     ~(cont state)))
 
-(defn- compile-regex-part [value]
-  (cond
-    (string? value) (java.util.regex.Pattern/quote value)
-    (symbol? value) (str "(" (:re (meta value) "[^/]+") ")")))
+(defmethod compile-route-part :string [{:keys [path] :as state} [_ s] cont]
+  `(if (str/starts-with? ~path ~s)
+     (let [~path (subs ~path ~(count s))]
+       ~(cont (assoc state :path-matched? true)))))
 
-(defn- compile-regex [route]
-  (re-pattern (str (str/join (map compile-regex-part route)) "(.*)")))
+(defmethod compile-route-part :symbol [{:keys [path] :as state} [_ sym] cont]
+  (let [re (re-pattern (str "(" (:re (meta sym) "[^/]+") ")(.*)"))]
+    `(if-let [[~sym ~path] (next (re-matches ~re ~path))]
+       ~(cont (assoc state :path-matched? true)))))
 
-(defn- compile-groups [route path]
-  `[~'_ ~@(filter symbol? route) ~path])
+(defmethod compile-route-part :map [{:keys [request] :as state} [_ m] cont]
+  `(match [~request] [~m] ~(cont state) :else nil))
 
-(defmethod compile-clause ::vector [{:keys [path] :as state} [route result]]
-  (let [groups (compile-groups route path)
-        regex  (compile-regex route)]
-    `(if-let [~groups (re-matches ~regex ~path)]
-       ~(compile-result (assoc state :path-matched? true) result))))
+(defn- compile-routes [state routes result]
+  (if (seq routes)
+    (compile-route-part state (first routes) #(compile-routes % (rest routes) result))
+    (compile-result state result)))
 
-(defn- compile-conditions [state routes]
-  `(or ~@(for [route routes] (compile-clause state route))))
+(defn- compile-entry [state {:keys [route result]}]
+  (match route
+    [:multiple rs] (compile-routes state rs result)
+    [:single   r]  (compile-routes state [r] result)))
+
+(defn- compile-routing-table [state [_ table]]
+  `(or ~@(map #(compile-entry state %) table)))
 
 (defn- compile-matches [routes]
   (let [request (gensym "request")
-        path    (gensym "path")]
+        path    (gensym "path")
+        state   {:request request, :path path}
+        table   (s/conform ::routing-table routes)]
     `(fn [~request]
        (let [~path (or (:path-info ~request) (:uri ~request))]
-         ~(compile-conditions {:request request, :path path} routes)))))
+         ~(compile-routing-table state table)))))
 
 (defn- flatten-routes [routes]
   (mapcat
