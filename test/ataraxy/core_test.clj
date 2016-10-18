@@ -49,6 +49,17 @@
         {:request-method :put}    [:write]
         {:request-method :delete} nil)))
 
+  (testing "set routes"
+    (let [routes '{#{x} [:foo x], #{y} [:bar y], #{z w} [:baz z w]}]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:uri "/" :query-params {"x" "quz"}}       [:foo "quz"]
+        {:uri "/" :query-params {"y" "quz"}}       [:bar "quz"]
+        {:uri "/" :query-params {"z" "a" "w" "b"}} [:baz "a" "b"]
+        {:uri "/" :form-params {"x" "fp"}}         [:foo "fp"]
+        {:uri "/" :multipart-params {"x" "mp"}}    [:foo "mp"]
+        {:uri "/" :query-params {"z" "a"}}         nil
+        {:uri "/"}                                 nil)))
+
   (testing "map routes"
     (let [routes '{{:params {:p p}} [:p p], {:params {:q q}} [:q q]}]
       (are [req res] (= (ataraxy/matches routes req) res)

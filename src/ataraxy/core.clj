@@ -109,6 +109,13 @@
     `(if-let [[~sym ~path] (next (re-matches ~re ~path))]
        ~(cont (assoc state :path-matched? true)))))
 
+(defmethod compile-route-part :set [{:keys [request] :as state} [_ s] cont]
+  `(let [{:strs [~@s]} (or (:query-params ~request)
+                           (:form-params ~request)
+                           (:multipart-params ~request))]
+     (if (and ~@s)
+       ~(cont state))))
+
 (defmethod compile-route-part :map [{:keys [request] :as state} [_ m] cont]
   `(match [~request] [~m] ~(cont state) :else nil))
 
