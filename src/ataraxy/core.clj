@@ -6,11 +6,10 @@
   (s/and set? (s/coll-of symbol?)))
 
 (s/def ::route-single
-  (s/or :keyword keyword?
-        :string  string?
-        :symbol  symbol?
-        :map     map?
-        :set     ::route-set))
+  (s/or :method  keyword?
+        :path    (s/or :string string? :symbol symbol?)
+        :params  (s/and set? (s/coll-of symbol?))
+        :request map?))
 
 (s/def ::route-multiple
   (s/and vector? (s/coll-of ::route-single)))
