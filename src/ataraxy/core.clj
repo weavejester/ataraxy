@@ -1,5 +1,6 @@
 (ns ataraxy.core
-  (:require [clojure.spec :as s]))
+  (:require [clojure.spec :as s]
+            [clojure.core.match :refer [match]]))
 
 (s/def ::route-set
   (s/and set? (s/coll-of symbol?)))
@@ -31,3 +32,29 @@
 
 (defn valid? [routes]
   (s/valid? ::routing-table routes))
+
+(defn- parse-single-route [context [type value]]
+  (update context type (fnil conj []) value))
+
+(defn- parse-route [context [type route]]
+  (case type
+    :single   (parse-single-route context route)
+    :multiple (reduce parse-single-route context route)))
+
+(declare parse-routing-table)
+
+(defn- parse-result [context [type result]]
+  (case type
+    :routes (parse-routing-table context result)
+    :result [[context result]]))
+
+(defn- parse-route-result [context {:keys [route result]}]
+  (-> context
+      (parse-route route)
+      (parse-result result)))
+
+(defn- parse-routing-table [context [_ routes]]
+  (mapcat (partial parse-route-result context) routes))
+
+(defn parse [routes]
+  (parse-routing-table {} (s/conform ::routing-table routes)))
