@@ -56,4 +56,5 @@
   (mapcat (partial parse-route-result context) routes))
 
 (defn parse [routes]
+  {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table routes)))
