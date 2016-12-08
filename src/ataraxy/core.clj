@@ -9,7 +9,7 @@
   (s/or :method  keyword?
         :path    (s/or :string string? :symbol symbol?)
         :params  (s/and set? (s/coll-of symbol?))
-        :request map?))
+        :request :clojure.core.specs/map-binding-form))
 
 (s/def ::route-multiple
   (s/and vector? (s/coll-of ::route-single)))
