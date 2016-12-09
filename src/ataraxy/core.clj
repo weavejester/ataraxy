@@ -80,7 +80,9 @@
 (defn- compile-match-params [request params next-form]
   (if (some? params)
     (let [params (apply set/union params)]
-      `(let [{:keys [~@params]} ~request]
+      `(let [{:strs [~@params]} (merge (:query-params ~request)
+                                       (:form-params ~request)
+                                       (:multipart-params ~request))]
          (if (and ~@params)
            ~next-form)))
     next-form))
