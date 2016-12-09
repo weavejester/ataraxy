@@ -2,8 +2,7 @@
   (:refer-clojure :exclude [compile])
   (:require [clojure.set :as set]
             [clojure.spec :as s]
-            [clojure.string :as str]
-            [clojure.core.match :refer [match]]))
+            [clojure.string :as str]))
 
 (s/def ::route-set
   (s/and set? (s/coll-of symbol?)))
