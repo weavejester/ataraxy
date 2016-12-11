@@ -82,9 +82,9 @@ vectors, beginning with a keyword.
 Here's a semi-formal definition of the syntax:
 
 ```
-table  = {route <result | table>} | (route <result | table>)
+table  = {<route result>+} | (<route result>+)
 route  = keyword | string | symbol | set | map | [route+]
-result = [keyword symbol*]
+result = table | [keyword symbol*]
 ```
 
 ### Keyword routes
