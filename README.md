@@ -49,9 +49,9 @@ We can match a request map to a result with `matches`:
 => [:foo]
 ```
 
-If Ataraxy cannot find a matching route, then `nil` will be
-returned. **This behavior may be changed in future** in order to
-support more informative failure messages.
+If Ataraxy cannot find a matching route, then `[:ataraxy/not-found]`
+will be returned. This behavior may be extended in future to support
+different types of failure.
 
 For performance, we can also pre-compile the routing data:
 

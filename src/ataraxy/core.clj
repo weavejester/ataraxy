@@ -119,7 +119,8 @@
 (defn compile-match [routes]
   (let [request (gensym "request")]
     `(fn [~request]
-       (or ~@(map (partial compile-match-route request) (parse routes))))))
+       (or ~@(map (partial compile-match-route request) (parse routes))
+           [:ataraxy/not-found]))))
 
 (defprotocol Routes
   (-matches [routes request]))
