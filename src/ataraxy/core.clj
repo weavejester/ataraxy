@@ -149,6 +149,5 @@
   (let [routes (compile routes)]
     (fn [request]
       (let [result  (matches routes request)
-            key     (first result)
-            handler (handler-map key (default-handlers key))]
+            handler (handler-map (first result))]
         (handler (assoc request :ataraxy/result result))))))
