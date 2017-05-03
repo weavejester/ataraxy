@@ -72,13 +72,14 @@ handler function. Ataraxy has a function called `handler` for this
 purpose:
 
 ```clojure
+(defn foo [request]
+  {:status 200, :headers {}, :body "Foo"})
+
+(defn not-found [request]
+  {:status 404, :headers {}, :body "Not found"})
+
 (def handler
-  (ataraxy/handler
-   routes
-   {:foo
-    (fn [req] {:status 200, :headers {}, :body "Foo"})
-    :ataraxy/not-found
-    (fn [req] {:status 404, :headers {}, :body "Not found"})}))
+  (ataraxy/handler routes {:foo foo, :ataraxy/not-found not-found}))
 ```
 
 This function takes two arguments; the routes and a map of keys to
