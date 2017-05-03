@@ -67,6 +67,24 @@ raw data structure:
 => [:foo]
 ```
 
+Once we have our routes, it's likely we want to turn them into a Ring
+handler function. Ataraxy has a function called `handler` for this
+purpose:
+
+```clojure
+(def handler
+  (ataraxy/handler
+   routes
+   {:foo
+    (fn [req] {:status 200, :headers {}, :body "Foo"})
+    :ataraxy/not-found
+    (fn [req] {:status 404, :headers {}, :body "Not found"})}))
+```
+
+This function takes two arguments; the routes and a map of keys to
+handlers. The full result will be added to the `:ataraxy/result` key
+on the request map.
+
 
 ## Syntax
 
