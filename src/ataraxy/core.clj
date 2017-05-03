@@ -138,3 +138,17 @@
   (if (satisfies? Routes routes)
     (-matches routes request)
     (-matches (compile routes) request)))
+
+(defn result-keys [routes]
+  (->> (parse routes)
+       (map (comp :key second))
+       (cons :ataraxy/not-found)))
+
+(defn handler [routes handler-map]
+  {:pre [(set/subset? (set (result-keys routes)) (set (keys handler-map)))]}
+  (let [routes (compile routes)]
+    (fn [request]
+      (let [result  (matches routes request)
+            key     (first result)
+            handler (handler-map key (default-handlers key))]
+        (handler (assoc request :ataraxy/result result))))))

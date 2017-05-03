@@ -91,3 +91,20 @@
         {:request-method :get, :uri "/foo"}    [:foo]
         {:request-method :get, :uri "/foo/10"} [:foo "10"]
         {:uri "/foo"}                          [:ataraxy/not-found]))))
+
+(deftest test-handler
+  (let [handler (ataraxy/handler
+                 '{[:get "/foo"]     [:foo]
+                   [:get "/bar/" id] [:bar id]}
+                 {:foo
+                  (constantly {:status 200, :headers {}, :body "foo"})
+                  :bar
+                  (fn [{[_ id] :ataraxy/result}]
+                    {:status 200, :headers {}, :body (str "bar" id)})
+                  :ataraxy/not-found
+                  (constantly nil)})]
+    (is (= (handler {:request-method :get, :uri "/foo"})
+           {:status 200, :headers {}, :body "foo"}))
+    (is (= (handler {:request-method :get, :uri "/bar/baz"})
+           {:status 200, :headers {}, :body "barbaz"}))
+    (is (nil? (handler {:request-method :get, :uri "/baz"})))))
