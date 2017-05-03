@@ -1,7 +1,8 @@
 (ns ataraxy.core
   (:refer-clojure :exclude [compile])
   (:require [clojure.set :as set]
-            [clojure.spec :as s]
+            [clojure.spec.alpha :as s]
+            [clojure.core.specs.alpha :as specs]
             [clojure.string :as str]))
 
 (s/def ::route-set
@@ -11,7 +12,7 @@
   (s/or :method   keyword?
         :path     (s/or :string string? :symbol symbol?)
         :params   (s/and set? (s/coll-of symbol?))
-        :destruct :clojure.core.specs/map-binding-form))
+        :destruct ::specs/map-binding-form))
 
 (s/def ::route-multiple
   (s/and vector? (s/coll-of ::route-single)))
