@@ -33,10 +33,10 @@ Add the following dependency to your `project.clj` file:
     [ataraxy "0.1.0-SNAPSHOT"]
 
 
-## Overview
+## Usage
 
 Ataraxy uses a data structure to tell it how to route and destructure
-requests.
+requests. See the following section on [syntax](#syntax) for details.
 
 ```clojure
 (def routes '{"/foo" [:foo]})
