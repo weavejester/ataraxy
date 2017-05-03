@@ -145,7 +145,7 @@ to the symbol's metadata. For example:
 This will match URIs like "/dog", "/dig" and "/dug", and add the
 matched word to the result.
 
-### Set routees
+### Set routes
 
 A set of symbols will match URL-encoded parameters of the same name.
 For example:
