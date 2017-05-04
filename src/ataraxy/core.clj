@@ -145,10 +145,18 @@
        (map (comp :key second))
        (cons :ataraxy/not-found)))
 
+(defn- assoc-result [request result]
+  (assoc request :ataraxy/result result))
+
 (defn handler [routes handler-map]
   {:pre [(set/subset? (set (result-keys routes)) (set (keys handler-map)))]}
   (let [routes (compile routes)]
-    (fn [request]
-      (let [result  (matches routes request)
-            handler (handler-map (first result))]
-        (handler (assoc request :ataraxy/result result))))))
+    (fn
+      ([request]
+       (let [result  (matches routes request)
+             handler (handler-map (first result))]
+         (handler (assoc-result request result))))
+      ([request respond raise]
+       (let [result  (matches routes request)
+             handler (handler-map (first result))]
+         (handler (assoc-result request result) respond raise))))))

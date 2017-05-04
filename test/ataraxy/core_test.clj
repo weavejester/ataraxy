@@ -93,18 +93,41 @@
         {:uri "/foo"}                          [:ataraxy/not-found]))))
 
 (deftest test-handler
-  (let [handler (ataraxy/handler
-                 '{[:get "/foo"]     [:foo]
-                   [:get "/bar/" id] [:bar id]}
-                 {:foo
-                  (constantly {:status 200, :headers {}, :body "foo"})
-                  :bar
-                  (fn [{[_ id] :ataraxy/result}]
-                    {:status 200, :headers {}, :body (str "bar" id)})
-                  :ataraxy/not-found
-                  (constantly nil)})]
-    (is (= (handler {:request-method :get, :uri "/foo"})
-           {:status 200, :headers {}, :body "foo"}))
-    (is (= (handler {:request-method :get, :uri "/bar/baz"})
-           {:status 200, :headers {}, :body "barbaz"}))
-    (is (nil? (handler {:request-method :get, :uri "/baz"})))))
+  (testing "synchronous handler"
+    (let [handler (ataraxy/handler
+                   '{[:get "/foo"]     [:foo]
+                     [:get "/bar/" id] [:bar id]}
+                   {:foo
+                    (constantly {:status 200, :headers {}, :body "foo"})
+                    :bar
+                    (fn [{[_ id] :ataraxy/result}]
+                      {:status 200, :headers {}, :body (str "bar" id)})
+                    :ataraxy/not-found
+                    (constantly nil)})]
+      (is (= (handler {:request-method :get, :uri "/foo"})
+             {:status 200, :headers {}, :body "foo"}))
+      (is (= (handler {:request-method :get, :uri "/bar/baz"})
+             {:status 200, :headers {}, :body "barbaz"}))
+      (is (nil? (handler {:request-method :get, :uri "/baz"})))))
+
+  (testing "asynchronous handler"
+    (let [handler (ataraxy/handler
+                   '{[:get "/foo"]     [:foo]
+                     [:get "/bar/" id] [:bar id]}
+                   {:foo
+                    (fn [request respond raise]
+                      (respond {:status 200, :headers {}, :body "foo"}))
+                    :bar
+                    (fn [{[_ id] :ataraxy/result} respond raise]
+                      (respond {:status 200, :headers {}, :body (str "bar" id)}))
+                    :ataraxy/not-found
+                    (fn [request respond raise] (respond nil))})]
+      (let [respond (promise), raise (promise)]
+        (handler {:request-method :get, :uri "/foo"} respond raise)
+        (is (= @respond {:status 200, :headers {}, :body "foo"})))
+      (let [respond (promise), raise (promise)]
+        (handler {:request-method :get, :uri "/bar/baz"} respond raise)
+        (is (= @respond {:status 200, :headers {}, :body "barbaz"})))
+      (let [respond (promise), raise (promise)]
+        (handler {:request-method :get, :uri "/baz"} respond raise)
+        (is (nil? @respond))))))
