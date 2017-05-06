@@ -139,7 +139,7 @@ except a forward slash. The regex can be changed by adding a `:re` key
 to the symbol's metadata. For example:
 
 ```clojure
-{^{:re "/d.g"} w [:word w]} 
+{^{:re #"/d.g"} w [:word w]}
 ```
 
 This will match URIs like "/dog", "/dig" and "/dug", and add the
