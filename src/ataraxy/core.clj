@@ -65,6 +65,14 @@
 (defn- compile-match-result [{:keys [key args]}]
   `[~key ~@args])
 
+(defn- optional-binding? [sym]
+  (str/starts-with? (name sym) "?"))
+
+(defn- param-name [sym]
+  (if (optional-binding? sym)
+    (subs (name sym) 1)
+    (name sym)))
+
 (defn- find-symbols [x]
   (cond
     (coll? x)   (mapcat find-symbols x)
@@ -73,17 +81,21 @@
 (defn- compile-match-destruct [request destructs next-form]
   (if (some? destructs)
     `(let [~@(mapcat #(vector % request) destructs)]
-       (if (and ~@(find-symbols destructs))
+       (if (and ~@(remove optional-binding? (find-symbols destructs)))
          ~next-form))
     next-form))
+
+(defn- param-match-binding [request param]
+  (let [key (param-name param)]
+    [param `(or (get (:query-params ~request) ~key)
+                (get (:form-params ~request) ~key)
+                (get (:multipart-params ~request) ~key))]))
 
 (defn- compile-match-params [request params next-form]
   (if (some? params)
     (let [params (apply set/union params)]
-      `(let [{:strs [~@params]} (merge (:query-params ~request)
-                                       (:form-params ~request)
-                                       (:multipart-params ~request))]
-         (if (and ~@params)
+      `(let [~@(mapcat (partial param-match-binding request) params)]
+         (if (and ~@(remove optional-binding? params))
            ~next-form)))
     next-form))
 

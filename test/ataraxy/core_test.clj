@@ -65,6 +65,17 @@
         {:params {:q "query"}}   [:q "query"]
         {:params {:z "invalid"}} [:ataraxy/not-found])))
 
+  (testing "optional bindings"
+    (let [routes '{["/p" #{?p}] [:p ?p]
+                   ["/q" {{?q "q"} :query-params}] [:q ?q]}]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:uri "/p", :query-params {"p" "page"}}  [:p "page"]
+        {:uri "/p", :query-params {"q" "query"}} [:p nil]
+        {:uri "/q", :query-params {"q" "query"}} [:q "query"]
+        {:uri "/q", :query-params {"p" "page"}}  [:q nil]
+        {:uri "/z", :query-params {"p" "page"}}  [:ataraxy/not-found]
+        {:uri "/z", :query-params {"q" "query"}} [:ataraxy/not-found])))
+
   (testing "compiled routes"
     (let [routes (ataraxy/compile '{"/foo" [:foo]})]
       (are [req res] (= (ataraxy/matches routes req) res)
