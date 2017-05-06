@@ -154,9 +154,18 @@ For example:
 {#{q} [:query q]}
 ```
 
-This will match any request with "q" as a parameter. For example,
+This will match any request with `q` as a parameter. For example,
 "/search?q=foo".
 
+By default, the parameters must be set for the route to match. If you
+want the parameters to be optional, you can prefix them with a "?".
+
+```clojure
+{#{?q} [:query ?q]}
+```
+
+This works the same as the previous example, except that the route
+still matches if `q` is `nil`.
 
 ### Map routes
 
@@ -169,6 +178,9 @@ be `nil` for the route to match. For example:
 
 This route will match any request map with a `:user` key in the
 session.
+
+As with set routes, symbols prefixed with a "?" are considered
+optional and may be `nil`.
 
 
 ### Vector routes
