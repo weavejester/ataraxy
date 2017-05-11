@@ -45,7 +45,7 @@
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get}    [:read]
         {:request-method :put}    [:write]
-        {:request-method :delete} [:ataraxy/not-found])))
+        {:request-method :delete} [:ataraxy/method-not-allowed])))
 
   (testing "set routes"
     (let [routes '{#{x} [:foo x], #{y} [:bar y], #{z w} [:baz z w]}]
@@ -55,15 +55,15 @@
         {:uri "/" :query-params {"z" "a" "w" "b"}} [:baz "a" "b"]
         {:uri "/" :form-params {"x" "fp"}}         [:foo "fp"]
         {:uri "/" :multipart-params {"x" "mp"}}    [:foo "mp"]
-        {:uri "/" :query-params {"z" "a"}}         [:ataraxy/not-found]
-        {:uri "/"}                                 [:ataraxy/not-found])))
+        {:uri "/" :query-params {"z" "a"}}         [:ataraxy/bad-request]
+        {:uri "/"}                                 [:ataraxy/bad-request])))
 
   (testing "map routes"
     (let [routes '{{{p :p} :params} [:p p], {{:keys [q]} :params} [:q q]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:params {:p "page"}}    [:p "page"]
         {:params {:q "query"}}   [:q "query"]
-        {:params {:z "invalid"}} [:ataraxy/not-found])))
+        {:params {:z "invalid"}} [:ataraxy/bad-request])))
 
   (testing "optional bindings"
     (let [routes '{["/p" #{?p}] [:p ?p]
@@ -93,7 +93,7 @@
         {:uri "/baz", :query-params {"baz" "2"}} [:baz "2"]
         {:request-method :get, :uri "/x/8/y/3a"} [:xy "8" "3a"]
         {:uri "/foo"}                            [:ataraxy/not-found]
-        {:request-method :put, :uri "/bar"}      [:ataraxy/not-found]
+        {:request-method :put, :uri "/bar"}      [:ataraxy/method-not-allowed]
         {:request-method :get, :uri "/x/44/y/"}  [:ataraxy/not-found])))
 
   (testing "nested routes"
@@ -101,7 +101,14 @@
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get, :uri "/foo"}    [:foo]
         {:request-method :get, :uri "/foo/10"} [:foo "10"]
-        {:uri "/foo"}                          [:ataraxy/not-found]))))
+        {:uri "/foo"}                          [:ataraxy/method-not-allowed])))
+
+  (testing "error results"
+    (let [routes '{[:get "/foo/" id #{page}] [:foo id page]}]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:request-method :put, :uri "/foo"}    [:ataraxy/not-found]
+        {:request-method :put, :uri "/foo/10"} [:ataraxy/method-not-allowed]
+        {:request-method :get, :uri "/foo/10"} [:ataraxy/bad-request]))))
 
 (deftest test-handler
   (testing "synchronous handler"

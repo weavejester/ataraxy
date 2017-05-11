@@ -82,7 +82,8 @@
   (if (some? destructs)
     `(let [~@(mapcat #(vector % request) destructs)]
        (if (and ~@(remove optional-binding? (find-symbols destructs)))
-         ~next-form))
+         ~next-form
+         [:ataraxy/bad-request]))
     next-form))
 
 (defn- param-match-binding [request param]
@@ -96,7 +97,8 @@
     (let [params (apply set/union params)]
       `(let [~@(mapcat (partial param-match-binding request) params)]
          (if (and ~@(remove optional-binding? params))
-           ~next-form)))
+           ~next-form
+           [:ataraxy/bad-request])))
     next-form))
 
 (defn- path-symbols [path]
@@ -114,26 +116,54 @@
   (if (some? path)
     `(let [path-info# (or (:path-info ~request) (:uri ~request))]
        (if-let [~(path-symbols path) (re-matches ~(path-regex path) path-info#)]
-         ~next-form))
+         ~next-form
+         [:ataraxy/not-found]))
     next-form))
 
 (defn- compile-match-method [request method next-form]
   (if (some? method)
-    `(if (= ~(first method) (:request-method ~request)) ~next-form)
+    `(if (= ~(first method) (:request-method ~request))
+       ~next-form
+       [:ataraxy/method-not-allowed])
     next-form))
 
 (defn- compile-match-route [request [{:keys [method path params destruct]} result]]
   (->> (compile-match-result result)
        (compile-match-destruct request destruct)
        (compile-match-params request params)
-       (compile-match-path request path)
-       (compile-match-method request method)))
+       (compile-match-method request method)
+       (compile-match-path request path)))
+
+(def ^:private failures
+  {:ataraxy/not-found          1
+   :ataraxy/method-not-allowed 2
+   :ataraxy/bad-request        3})
+
+(defn best-result [a b]
+  (if-let [fa (failures (first a))]
+    (if-let [fb (failures (first b))]
+      (if (>= fa fb) a b)
+      b)
+    a))
+
+(defn failed-result? [result]
+  (contains? failures (first result)))
+
+(defn- compile-match-route-seq [request result routes]
+  (if (seq routes)
+    (let [route (first routes)]
+      `(let [~result (best-result ~result ~(compile-match-route request route))]
+         (if (failed-result? ~result)
+           ~(compile-match-route-seq request result (rest routes))
+           ~result)))
+    result))
 
 (defn compile-match [routes]
-  (let [request (gensym "request")]
+  (let [request (gensym "request")
+        result  (gensym "result")]
     `(fn [~request]
-       (or ~@(map (partial compile-match-route request) (parse routes))
-           [:ataraxy/not-found]))))
+       (let [~result [:ataraxy/not-found]]
+         ~(compile-match-route-seq request result (parse routes))))))
 
 (defprotocol Routes
   (-matches [routes request]))
