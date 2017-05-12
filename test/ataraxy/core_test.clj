@@ -120,14 +120,19 @@
                     (constantly {:status 200, :headers {}, :body "foo"})
                     :bar
                     (fn [{[_ id] :ataraxy/result}]
-                      {:status 200, :headers {}, :body (str "bar" id)})
-                    ::err/unmatched-path
-                    (constantly nil)})]
+                      {:status 200, :headers {}, :body (str "bar" id)})})]
       (is (= (handler {:request-method :get, :uri "/foo"})
              {:status 200, :headers {}, :body "foo"}))
       (is (= (handler {:request-method :get, :uri "/bar/baz"})
              {:status 200, :headers {}, :body "barbaz"}))
-      (is (nil? (handler {:request-method :get, :uri "/baz"})))))
+      (is (= (handler {:request-method :get, :uri "/baz"})
+             {:status  404
+              :headers {"Content-Type" "text/plain; charset=UTF-8"}
+              :body    "Not Found"}))
+      (is (= (handler {:request-method :put, :uri "/foo"})
+             {:status  405
+              :headers {"Content-Type" "text/plain; charset=UTF-8"}
+              :body    "Method Not Allowed"}))))
 
   (testing "asynchronous handler"
     (let [handler (ataraxy/handler
@@ -138,9 +143,7 @@
                       (respond {:status 200, :headers {}, :body "foo"}))
                     :bar
                     (fn [{[_ id] :ataraxy/result} respond raise]
-                      (respond {:status 200, :headers {}, :body (str "bar" id)}))
-                    ::err/unmatched-path
-                    (fn [request respond raise] (respond nil))})]
+                      (respond {:status 200, :headers {}, :body (str "bar" id)}))})]
       (let [respond (promise), raise (promise)]
         (handler {:request-method :get, :uri "/foo"} respond raise)
         (is (= @respond {:status 200, :headers {}, :body "foo"})))
@@ -149,4 +152,11 @@
         (is (= @respond {:status 200, :headers {}, :body "barbaz"})))
       (let [respond (promise), raise (promise)]
         (handler {:request-method :get, :uri "/baz"} respond raise)
-        (is (nil? @respond))))))
+        (is (= @respond {:status  404
+                         :headers {"Content-Type" "text/plain; charset=UTF-8"}
+                         :body    "Not Found"})))
+      (let [respond (promise), raise (promise)]
+        (handler {:request-method :put, :uri "/foo"} respond raise)
+        (is (= @respond {:status  405
+                         :headers {"Content-Type" "text/plain; charset=UTF-8"}
+                         :body    "Method Not Allowed"}))))))

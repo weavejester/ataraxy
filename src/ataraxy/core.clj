@@ -181,22 +181,21 @@
     (-matches (compile routes) request)))
 
 (defn result-keys [routes]
-  (->> (parse routes)
-       (map (comp :key second))
-       (cons ::err/unmatched-path)))
+  (map (comp :key second) (parse routes)))
 
 (defn- assoc-result [request result]
   (assoc request :ataraxy/result result))
 
 (defn handler [routes handler-map]
   {:pre [(set/subset? (set (result-keys routes)) (set (keys handler-map)))]}
-  (let [routes (compile routes)]
+  (let [routes  (compile routes)
+        default (:default handler-map err/default-handler)]
     (fn
       ([request]
        (let [result  (matches routes request)
-             handler (handler-map (first result))]
+             handler (handler-map (first result) default)]
          (handler (assoc-result request result))))
       ([request respond raise]
        (let [result  (matches routes request)
-             handler (handler-map (first result))]
+             handler (handler-map (first result) default)]
          (handler (assoc-result request result) respond raise))))))
