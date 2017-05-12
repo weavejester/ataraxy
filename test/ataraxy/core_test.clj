@@ -14,14 +14,14 @@
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "/foo"}       [:foo]
         {:path-info "/bar"} [:bar]
-        {:uri "/baz"}       [:ataraxy/not-found])))
+        {:uri "/baz"}       [:ataraxy/unmatched-path])))
 
   (testing "list routing tables"
     (let [routes '("/foo" [:foo], "/bar" [:bar])]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "/foo"}       [:foo]
         {:path-info "/bar"} [:bar]
-        {:uri "/baz"}       [:ataraxy/not-found])))
+        {:uri "/baz"}       [:ataraxy/unmatched-path])))
 
   (testing "symbol routes"
     (let [routes '{x [:foo x]}]
@@ -34,18 +34,18 @@
                    ^{:re #"\d\d\d"} y [:bar y]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "10"}     [:foo "10"]
-        {:uri "1"}      [:ataraxy/not-found]
-        {:uri "bar"}    [:ataraxy/not-found]
-        {:uri "10/bar"} [:ataraxy/not-found]
+        {:uri "1"}      [:ataraxy/unmatched-path]
+        {:uri "bar"}    [:ataraxy/unmatched-path]
+        {:uri "10/bar"} [:ataraxy/unmatched-path]
         {:uri "200"}    [:bar "200"]
-        {:uri "1"}      [:ataraxy/not-found])))
+        {:uri "1"}      [:ataraxy/unmatched-path])))
 
   (testing "keyword routes"
     (let [routes '{:get [:read], :put [:write]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get}    [:read]
         {:request-method :put}    [:write]
-        {:request-method :delete} [:ataraxy/method-not-allowed])))
+        {:request-method :delete} [:ataraxy/unmatched-method])))
 
   (testing "set routes"
     (let [routes '{#{x} [:foo x], #{y} [:bar y], #{z w} [:baz z w]}]
@@ -55,15 +55,15 @@
         {:uri "/" :query-params {"z" "a" "w" "b"}} [:baz "a" "b"]
         {:uri "/" :form-params {"x" "fp"}}         [:foo "fp"]
         {:uri "/" :multipart-params {"x" "mp"}}    [:foo "mp"]
-        {:uri "/" :query-params {"z" "a"}}         [:ataraxy/bad-request]
-        {:uri "/"}                                 [:ataraxy/bad-request])))
+        {:uri "/" :query-params {"z" "a"}}         [:ataraxy/missing-params '#{x}]
+        {:uri "/"}                                 [:ataraxy/missing-params '#{x}])))
 
   (testing "map routes"
     (let [routes '{{{p :p} :params} [:p p], {{:keys [q]} :params} [:q q]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:params {:p "page"}}    [:p "page"]
         {:params {:q "query"}}   [:q "query"]
-        {:params {:z "invalid"}} [:ataraxy/bad-request])))
+        {:params {:z "invalid"}} [:ataraxy/missing-destruct '#{p}])))
 
   (testing "optional bindings"
     (let [routes '{["/p" #{?p}] [:p ?p]
@@ -73,14 +73,14 @@
         {:uri "/p", :query-params {"q" "query"}} [:p nil]
         {:uri "/q", :query-params {"q" "query"}} [:q "query"]
         {:uri "/q", :query-params {"p" "page"}}  [:q nil]
-        {:uri "/z", :query-params {"p" "page"}}  [:ataraxy/not-found]
-        {:uri "/z", :query-params {"q" "query"}} [:ataraxy/not-found])))
+        {:uri "/z", :query-params {"p" "page"}}  [:ataraxy/unmatched-path]
+        {:uri "/z", :query-params {"q" "query"}} [:ataraxy/unmatched-path])))
 
   (testing "compiled routes"
     (let [routes (ataraxy/compile '{"/foo" [:foo]})]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:uri "/foo"} [:foo]
-        {:uri "/bar"} [:ataraxy/not-found])))
+        {:uri "/bar"} [:ataraxy/unmatched-path])))
 
   (testing "vector routes"
     (let [routes '{["/foo/" foo]          [:foo foo]
@@ -92,23 +92,23 @@
         {:request-method :get, :uri "/bar"}      [:bar]
         {:uri "/baz", :query-params {"baz" "2"}} [:baz "2"]
         {:request-method :get, :uri "/x/8/y/3a"} [:xy "8" "3a"]
-        {:uri "/foo"}                            [:ataraxy/not-found]
-        {:request-method :put, :uri "/bar"}      [:ataraxy/method-not-allowed]
-        {:request-method :get, :uri "/x/44/y/"}  [:ataraxy/not-found])))
+        {:uri "/foo"}                            [:ataraxy/unmatched-path]
+        {:request-method :put, :uri "/bar"}      [:ataraxy/unmatched-method]
+        {:request-method :get, :uri "/x/44/y/"}  [:ataraxy/unmatched-path])))
 
   (testing "nested routes"
     (let [routes '{"/foo" {:get [:foo], ["/" id] {:get [:foo id]}}}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get, :uri "/foo"}    [:foo]
         {:request-method :get, :uri "/foo/10"} [:foo "10"]
-        {:uri "/foo"}                          [:ataraxy/method-not-allowed])))
+        {:request-method :put, :uri "/foo"}    [:ataraxy/unmatched-method])))
 
   (testing "error results"
     (let [routes '{[:get "/foo/" id #{page}] [:foo id page]}]
       (are [req res] (= (ataraxy/matches routes req) res)
-        {:request-method :put, :uri "/foo"}    [:ataraxy/not-found]
-        {:request-method :put, :uri "/foo/10"} [:ataraxy/method-not-allowed]
-        {:request-method :get, :uri "/foo/10"} [:ataraxy/bad-request]))))
+        {:request-method :put, :uri "/foo"}    [:ataraxy/unmatched-path]
+        {:request-method :put, :uri "/foo/10"} [:ataraxy/unmatched-method]
+        {:request-method :get, :uri "/foo/10"} [:ataraxy/missing-params '#{page}]))))
 
 (deftest test-handler
   (testing "synchronous handler"
@@ -120,7 +120,7 @@
                     :bar
                     (fn [{[_ id] :ataraxy/result}]
                       {:status 200, :headers {}, :body (str "bar" id)})
-                    :ataraxy/not-found
+                    :ataraxy/unmatched-path
                     (constantly nil)})]
       (is (= (handler {:request-method :get, :uri "/foo"})
              {:status 200, :headers {}, :body "foo"}))
@@ -138,7 +138,7 @@
                     :bar
                     (fn [{[_ id] :ataraxy/result} respond raise]
                       (respond {:status 200, :headers {}, :body (str "bar" id)}))
-                    :ataraxy/not-found
+                    :ataraxy/unmatched-path
                     (fn [request respond raise] (respond nil))})]
       (let [respond (promise), raise (promise)]
         (handler {:request-method :get, :uri "/foo"} respond raise)

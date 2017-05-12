@@ -78,12 +78,16 @@
     (coll? x)   (mapcat find-symbols x)
     (symbol? x) (list x)))
 
+(defn- missing-symbol-set [symbols]
+  `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
+
 (defn- compile-match-destruct [request destructs next-form]
   (if (some? destructs)
-    `(let [~@(mapcat #(vector % request) destructs)]
-       (if (and ~@(remove optional-binding? (find-symbols destructs)))
-         ~next-form
-         [:ataraxy/bad-request]))
+    (let [mandatory (remove optional-binding? (find-symbols destructs))]
+      `(let [~@(mapcat #(vector % request) destructs)]
+         (if (and ~@mandatory)
+           ~next-form
+           [:ataraxy/missing-destruct ~(missing-symbol-set mandatory)])))
     next-form))
 
 (defn- param-match-binding [request param]
@@ -94,11 +98,12 @@
 
 (defn- compile-match-params [request params next-form]
   (if (some? params)
-    (let [params (apply set/union params)]
+    (let [params    (apply set/union params)
+          mandatory (remove optional-binding? params)]
       `(let [~@(mapcat (partial param-match-binding request) params)]
-         (if (and ~@(remove optional-binding? params))
+         (if (and ~@mandatory)
            ~next-form
-           [:ataraxy/bad-request])))
+           [:ataraxy/missing-params ~(missing-symbol-set mandatory)])))
     next-form))
 
 (defn- path-symbols [path]
@@ -117,14 +122,14 @@
     `(let [path-info# (or (:path-info ~request) (:uri ~request))]
        (if-let [~(path-symbols path) (re-matches ~(path-regex path) path-info#)]
          ~next-form
-         [:ataraxy/not-found]))
+         [:ataraxy/unmatched-path]))
     next-form))
 
 (defn- compile-match-method [request method next-form]
   (if (some? method)
     `(if (= ~(first method) (:request-method ~request))
        ~next-form
-       [:ataraxy/method-not-allowed])
+       [:ataraxy/unmatched-method])
     next-form))
 
 (defn- compile-match-route [request [{:keys [method path params destruct]} result]]
@@ -135,9 +140,10 @@
        (compile-match-path request path)))
 
 (def ^:private failures
-  {:ataraxy/not-found          1
-   :ataraxy/method-not-allowed 2
-   :ataraxy/bad-request        3})
+  {:ataraxy/unmatched-path   1
+   :ataraxy/unmatched-method 2
+   :ataraxy/missing-params   3
+   :ataraxy/missing-destruct 4})
 
 (defn best-result [a b]
   (if-let [fa (failures (first a))]
@@ -162,7 +168,7 @@
   (let [request (gensym "request")
         result  (gensym "result")]
     `(fn [~request]
-       (let [~result [:ataraxy/not-found]]
+       (let [~result [:ataraxy/unmatched-path]]
          ~(compile-match-route-seq request result (parse routes))))))
 
 (defprotocol Routes
@@ -185,7 +191,7 @@
 (defn result-keys [routes]
   (->> (parse routes)
        (map (comp :key second))
-       (cons :ataraxy/not-found)))
+       (cons :ataraxy/unmatched-path)))
 
 (defn- assoc-result [request result]
   (assoc request :ataraxy/result result))
