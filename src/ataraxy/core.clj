@@ -186,12 +186,12 @@
        (-matches [_ request#] (matches# request#)))))
 
 (defn compile [routes]
-  (eval `(compile* ~routes)))
+  (if (satisfies? Routes routes)
+    routes
+    (eval `(compile* ~routes))))
 
 (defn matches [routes request]
-  (:result (if (satisfies? Routes routes)
-             (-matches routes request)
-             (-matches (compile routes) request))))
+  (:result (-matches (compile routes) request)))
 
 (defn result-keys [routes]
   (map (comp :key :result) (parse routes)))
