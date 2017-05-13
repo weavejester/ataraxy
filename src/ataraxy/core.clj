@@ -58,7 +58,9 @@
 (defn- parse-result [context [type result]]
   (case type
     :routes (parse-routing-table context result)
-    :result [[(update-meta context (:meta result)) (:value result)]]))
+    :result [(-> context
+                 (update-meta (:meta result))
+                 (assoc :result (:value result)))]))
 
 (defn- parse-route-result [context {:keys [route result]}]
   (-> context
@@ -142,7 +144,7 @@
        [::err/unmatched-method])
     next-form))
 
-(defn- compile-match-route [request [{:keys [method path params destruct]} result]]
+(defn- compile-match-route [request {:keys [method path params destruct result]}]
   (->> (compile-match-result result)
        (compile-match-destruct request destruct)
        (compile-match-params request params)
@@ -190,7 +192,7 @@
     (-matches (compile routes) request)))
 
 (defn result-keys [routes]
-  (map (comp :key second) (parse routes)))
+  (map (comp :key :result) (parse routes)))
 
 (defn- assoc-result [request result]
   (assoc request :ataraxy/result result))
