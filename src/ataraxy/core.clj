@@ -74,8 +74,9 @@
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table routes)))
 
-(defn- compile-match-result [{:keys [key args]}]
-  `[~key ~@args])
+(defn- compile-match-result [{:keys [key args]} meta]
+  `{:result [~key ~@args]
+    :meta   '~(apply into {} meta)})
 
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
@@ -99,7 +100,7 @@
       `(let [~@(mapcat #(vector % request) destructs)]
          (if (and ~@mandatory)
            ~next-form
-           [::err/missing-destruct ~(missing-symbol-set mandatory)])))
+           {:result [::err/missing-destruct ~(missing-symbol-set mandatory)]})))
     next-form))
 
 (defn- param-match-binding [request param]
@@ -115,7 +116,7 @@
       `(let [~@(mapcat (partial param-match-binding request) params)]
          (if (and ~@mandatory)
            ~next-form
-           [::err/missing-params ~(missing-symbol-set mandatory)])))
+           {:result [::err/missing-params ~(missing-symbol-set mandatory)]})))
     next-form))
 
 (defn- path-symbols [path]
@@ -134,18 +135,18 @@
     `(let [path-info# (or (:path-info ~request) (:uri ~request))]
        (if-let [~(path-symbols path) (re-matches ~(path-regex path) path-info#)]
          ~next-form
-         [::err/unmatched-path]))
+         {:result [::err/unmatched-path]}))
     next-form))
 
 (defn- compile-match-method [request method next-form]
   (if (some? method)
     `(if (= ~(first method) (:request-method ~request))
        ~next-form
-       [::err/unmatched-method])
+       {:result [::err/unmatched-method]})
     next-form))
 
-(defn- compile-match-route [request {:keys [method path params destruct result]}]
-  (->> (compile-match-result result)
+(defn- compile-match-route [request {:keys [method path params destruct result meta]}]
+  (->> (compile-match-result result meta)
        (compile-match-destruct request destruct)
        (compile-match-params request params)
        (compile-match-method request method)
@@ -161,11 +162,12 @@
 (defn- compile-match-route-seq [request result routes]
   (if (seq routes)
     (let [route (first routes)]
-      `(let [~result (best-result ~result ~(compile-match-route request route))]
+      `(let [match# ~(compile-match-route request route)
+             ~result (best-result ~result (:result match#))]
          (if (err/error-result? ~result)
            ~(compile-match-route-seq request result (rest routes))
-           ~result)))
-    result))
+           match#)))
+    {:result result}))
 
 (defn compile-match [routes]
   (let [request (gensym "request")
@@ -187,9 +189,9 @@
   (eval `(compile* ~routes)))
 
 (defn matches [routes request]
-  (if (satisfies? Routes routes)
-    (-matches routes request)
-    (-matches (compile routes) request)))
+  (:result (if (satisfies? Routes routes)
+             (-matches routes request)
+             (-matches (compile routes) request))))
 
 (defn result-keys [routes]
   (map (comp :key :result) (parse routes)))
