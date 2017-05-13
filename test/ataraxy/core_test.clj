@@ -5,9 +5,10 @@
 
 (deftest test-valid?
   (are [x y] (= (ataraxy/valid? x) y)
-    '{"/foo" [:bar]} true
-    '{"/foo" :bar}   false
-    '{"/foo" (:bar)} false))
+    '{"/foo" [:bar]}        true
+    '{"/foo" :bar}          false
+    '{"/foo" (:bar)}        false
+    '{"/x" [:x], "/y" [:x]} false))
 
 (deftest test-matches
   (testing "string routes"
@@ -98,10 +99,10 @@
         {:request-method :get, :uri "/x/44/y/"}  [::err/unmatched-path])))
 
   (testing "nested routes"
-    (let [routes '{"/foo" {:get [:foo], ["/" id] {:get [:foo id]}}}]
+    (let [routes '{"/foo" {:get [:foo], ["/" id] {:get [:bar id]}}}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get, :uri "/foo"}    [:foo]
-        {:request-method :get, :uri "/foo/10"} [:foo "10"]
+        {:request-method :get, :uri "/foo/10"} [:bar "10"]
         {:request-method :put, :uri "/foo"}    [::err/unmatched-method])))
 
   (testing "error results"

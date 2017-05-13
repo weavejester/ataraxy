@@ -35,9 +35,21 @@
   (s/cat :route  ::route
          :result (s/or :result ::result :routes ::routing-table)))
 
+(defn- conformed-results [[_ routes]]
+  (mapcat (fn [{[k {v :value}] :result}]
+            (case k
+              :result [v]
+              :routes (conformed-results v)))
+          routes))
+
+(defn- distinct-result-keys? [routing-table]
+  (apply distinct? (map :key (conformed-results routing-table))))
+
 (s/def ::routing-table
-  (meta-conformer (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
-                        :ordered   (s/and list? (s/* ::route-result)))))
+  (meta-conformer
+   (s/and (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
+                :ordered   (s/and list? (s/* ::route-result)))
+          distinct-result-keys?)))
 
 (defn valid? [routes]
   (s/valid? ::routing-table routes))
