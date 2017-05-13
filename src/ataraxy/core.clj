@@ -6,6 +6,12 @@
             [clojure.core.specs.alpha :as specs]
             [clojure.string :as str]))
 
+(defn- meta-conformer [spec]
+  (s/conformer #(let [val (s/conform spec %)]
+                  (if (= val ::s/invalid)
+                    ::s/invalid
+                    {:value val, :meta (meta %)}))))
+
 (s/def ::route-set
   (s/and set? (s/coll-of symbol?)))
 
@@ -23,15 +29,15 @@
         :multiple ::route-multiple))
 
 (s/def ::result
-  (s/and vector? (s/cat :key keyword? :args (s/* symbol?))))
+  (meta-conformer (s/and vector? (s/cat :key keyword? :args (s/* symbol?)))))
 
 (s/def ::route-result
   (s/cat :route  ::route
          :result (s/or :result ::result :routes ::routing-table)))
 
 (s/def ::routing-table
-  (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
-        :ordered   (s/and list? (s/* ::route-result))))
+  (meta-conformer (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
+                        :ordered   (s/and list? (s/* ::route-result)))))
 
 (defn valid? [routes]
   (s/valid? ::routing-table routes))
@@ -46,18 +52,21 @@
 
 (declare parse-routing-table)
 
+(defn- update-meta [context meta]
+  (cond-> context meta (update :meta (fnil conj []) meta)))
+
 (defn- parse-result [context [type result]]
   (case type
     :routes (parse-routing-table context result)
-    :result [[context result]]))
+    :result [[(update-meta context (:meta result)) (:value result)]]))
 
 (defn- parse-route-result [context {:keys [route result]}]
   (-> context
       (parse-route route)
       (parse-result result)))
 
-(defn- parse-routing-table [context [_ routes]]
-  (mapcat (partial parse-route-result context) routes))
+(defn- parse-routing-table [context {[_ routes] :value, meta :meta}]
+  (mapcat (partial parse-route-result (update-meta context meta)) routes))
 
 (defn parse [routes]
   {:pre [(valid? routes)]}
