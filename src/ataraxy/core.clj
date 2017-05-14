@@ -6,11 +6,8 @@
             [clojure.core.specs.alpha :as specs]
             [clojure.string :as str]))
 
-(defn- meta-conformer [spec]
-  (s/conformer #(let [val (s/conform spec %)]
-                  (if (= val ::s/invalid)
-                    ::s/invalid
-                    {:value val, :meta (meta %)}))))
+(s/def ::with-meta
+  (s/conformer (fn [v] [v (meta v)])))
 
 (s/def ::route-set
   (s/and set? (s/coll-of symbol?)))
@@ -29,11 +26,15 @@
         :multiple ::route-multiple))
 
 (s/def ::result
-  (meta-conformer (s/and vector? (s/cat :key keyword? :args (s/* symbol?)))))
+  (s/and vector? (s/cat :key keyword? :args (s/* symbol?))))
+
+(s/def ::result-with-meta
+  (s/and ::with-meta (s/cat :value ::result, :meta (s/nilable map?))))
 
 (s/def ::route-result
   (s/cat :route  ::route
-         :result (s/or :result ::result :routes ::routing-table)))
+         :result (s/or :result ::result-with-meta
+                       :routes ::routing-table-with-meta)))
 
 (defn- conformed-results [[_ routes]]
   (mapcat (fn [{[k {v :value}] :result}]
@@ -46,13 +47,15 @@
   (apply distinct? (map :key (conformed-results routing-table))))
 
 (s/def ::routing-table
-  (meta-conformer
-   (s/and (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
-                :ordered   (s/and list? (s/* ::route-result)))
-          distinct-result-keys?)))
+  (s/and (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
+               :ordered   (s/and list? (s/* ::route-result)))
+          distinct-result-keys?))
+
+(s/def ::routing-table-with-meta
+  (s/and ::with-meta (s/cat :value ::routing-table, :meta (s/nilable map?))))
 
 (defn valid? [routes]
-  (s/valid? ::routing-table routes))
+  (s/valid? ::routing-table-with-meta routes))
 
 (defn- parse-single-route [context [type value]]
   (update context type (fnil conj []) value))
@@ -84,7 +87,7 @@
 
 (defn parse [routes]
   {:pre [(valid? routes)]}
-  (parse-routing-table {} (s/conform ::routing-table routes)))
+  (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
 (defn- compile-match-result [{:keys [key args]} meta]
   `{:result [~key ~@args]
