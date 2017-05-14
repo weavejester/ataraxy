@@ -160,4 +160,28 @@
         (handler {:request-method :put, :uri "/foo"} respond raise)
         (is (= @respond {:status  405
                          :headers {"Content-Type" "text/plain; charset=UTF-8"}
-                         :body    "Method Not Allowed"}))))))
+                         :body    "Method Not Allowed"})))))
+
+  (testing "middleware"
+    (let [handler (ataraxy/handler
+                   '{"/foo" {:get ^:baz [:foo]}
+                     "/bar" ^{:quz 9} {["/" id] {:get [:bar id]}}}
+                   {:foo
+                    (constantly {:status 200, :headers {}, :body "foo"})
+                    :bar
+                    (fn [{[_ id] :ataraxy/result}]
+                      {:status 200, :headers {}, :body (str "bar" id)})}
+                   {:baz
+                    (fn [handler]
+                      #(assoc-in (handler %) [:headers "X-Middle"] "baz"))
+                    :quz
+                    (fn [handler x]
+                      #(assoc-in (handler %) [:headers "X-Middle"] (str "quz" x)))})]
+      (is (= (handler {:request-method :get, :uri "/foo"})
+             {:status 200, :headers {"X-Middle" "baz"}, :body "foo"}))
+      (is (= (handler {:request-method :get, :uri "/bar/10"})
+             {:status 200, :headers {"X-Middle" "quz9"}, :body "bar10"}))
+      (is (= (handler {:request-method :get, :uri "/baz"})
+             {:status  404
+              :headers {"Content-Type" "text/plain; charset=UTF-8"}
+              :body    "Not Found"})))))

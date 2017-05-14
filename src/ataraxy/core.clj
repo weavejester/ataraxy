@@ -214,16 +214,39 @@
 (defn- assoc-result [request result]
   (assoc request :ataraxy/result result))
 
-(defn handler [routes handler-map]
-  {:pre [(set/subset? (set (result-keys routes)) (set (keys handler-map)))]}
-  (let [routes  (compile routes)
-        default (:default handler-map err/default-handler)]
-    (fn
-      ([request]
-       (let [result  (matches routes request)
-             handler (handler-map (first result) default)]
-         (handler (assoc-result request result))))
-      ([request respond raise]
-       (let [result  (matches routes request)
-             handler (handler-map (first result) default)]
-         (handler (assoc-result request result) respond raise))))))
+(defn- result-metadata [routes]
+  (->> (parse routes)
+       (map (juxt (comp :key :result) #(apply merge (:meta %))))
+       (into {})))
+
+(defn- wrap-handler [handler handler-key metadata-map middleware-map]
+  (reduce
+   (fn [handler [k v]]
+     (if-let [middleware (middleware-map k)]
+       (if (true? v) (middleware handler) (middleware handler v))
+       handler))
+   handler
+   (sort-by key (metadata-map handler-key))))
+
+(defn- wrap-handler-map [handler-map routes middleware-map]
+  (let [metadata-map (result-metadata routes)
+        wrap-handler (fn [[k h]] (wrap-handler h k metadata-map middleware-map))]
+    (into {} (map (juxt key wrap-handler) handler-map))))
+
+(defn handler
+  ([routes handler-map]
+   (handler routes handler-map {}))
+  ([routes handler-map middleware-map]
+   {:pre [(set/subset? (set (result-keys routes)) (set (keys handler-map)))]}
+   (let [handler-map (wrap-handler-map handler-map routes middleware-map)
+         default     (:default handler-map err/default-handler)
+         routes      (compile routes)]
+     (fn
+       ([request]
+        (let [result  (matches routes request)
+              handler (handler-map (first result) default)]
+          (handler (assoc-result request result))))
+       ([request respond raise]
+        (let [result  (matches routes request)
+              handler (handler-map (first result) default)]
+          (handler (assoc-result request result) respond raise)))))))
