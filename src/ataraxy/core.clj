@@ -234,19 +234,17 @@
     (into {} (map (juxt key wrap-handler) handler-map))))
 
 (defn handler
-  ([routes handler-map]
-   (handler routes handler-map {}))
-  ([routes handler-map middleware-map]
-   {:pre [(set/subset? (set (result-keys routes)) (set (keys handler-map)))]}
-   (let [handler-map (wrap-handler-map handler-map routes middleware-map)
-         default     (:default handler-map err/default-handler)
-         routes      (compile routes)]
-     (fn
-       ([request]
-        (let [result  (matches routes request)
-              handler (handler-map (first result) default)]
-          (handler (assoc-result request result))))
-       ([request respond raise]
-        (let [result  (matches routes request)
-              handler (handler-map (first result) default)]
-          (handler (assoc-result request result) respond raise)))))))
+  [{:keys [routes handlers middleware]}]
+  {:pre [(set/subset? (set (result-keys routes)) (set (keys handlers)))]}
+  (let [handlers (wrap-handler-map handlers routes middleware)
+        default  (:default handlers err/default-handler)
+        routes   (compile routes)]
+    (fn
+      ([request]
+       (let [result  (matches routes request)
+             handler (handlers (first result) default)]
+         (handler (assoc-result request result))))
+      ([request respond raise]
+       (let [result  (matches routes request)
+             handler (handlers (first result) default)]
+         (handler (assoc-result request result) respond raise))))))

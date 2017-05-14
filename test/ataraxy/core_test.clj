@@ -115,13 +115,15 @@
 (deftest test-handler
   (testing "synchronous handler"
     (let [handler (ataraxy/handler
-                   '{[:get "/foo"]     [:foo]
-                     [:get "/bar/" id] [:bar id]}
-                   {:foo
-                    (constantly {:status 200, :headers {}, :body "foo"})
-                    :bar
-                    (fn [{[_ id] :ataraxy/result}]
-                      {:status 200, :headers {}, :body (str "bar" id)})})]
+                   {:routes
+                    '{[:get "/foo"]     [:foo]
+                      [:get "/bar/" id] [:bar id]}
+                    :handlers
+                    {:foo
+                     (constantly {:status 200, :headers {}, :body "foo"})
+                     :bar
+                     (fn [{[_ id] :ataraxy/result}]
+                       {:status 200, :headers {}, :body (str "bar" id)})}})]
       (is (= (handler {:request-method :get, :uri "/foo"})
              {:status 200, :headers {}, :body "foo"}))
       (is (= (handler {:request-method :get, :uri "/bar/baz"})
@@ -137,14 +139,16 @@
 
   (testing "asynchronous handler"
     (let [handler (ataraxy/handler
-                   '{[:get "/foo"]     [:foo]
-                     [:get "/bar/" id] [:bar id]}
-                   {:foo
-                    (fn [request respond raise]
-                      (respond {:status 200, :headers {}, :body "foo"}))
-                    :bar
-                    (fn [{[_ id] :ataraxy/result} respond raise]
-                      (respond {:status 200, :headers {}, :body (str "bar" id)}))})]
+                   {:routes
+                    '{[:get "/foo"]     [:foo]
+                      [:get "/bar/" id] [:bar id]}
+                    :handlers
+                    {:foo
+                     (fn [request respond raise]
+                       (respond {:status 200, :headers {}, :body "foo"}))
+                     :bar
+                     (fn [{[_ id] :ataraxy/result} respond raise]
+                       (respond {:status 200, :headers {}, :body (str "bar" id)}))}})]
       (let [respond (promise), raise (promise)]
         (handler {:request-method :get, :uri "/foo"} respond raise)
         (is (= @respond {:status 200, :headers {}, :body "foo"})))
@@ -164,19 +168,22 @@
 
   (testing "middleware"
     (let [handler (ataraxy/handler
-                   '{"/foo" {:get ^:baz [:foo]}
-                     "/bar" ^{:quz 9} {["/" id] {:get [:bar id]}}}
-                   {:foo
-                    (constantly {:status 200, :headers {}, :body "foo"})
-                    :bar
-                    (fn [{[_ id] :ataraxy/result}]
-                      {:status 200, :headers {}, :body (str "bar" id)})}
-                   {:baz
-                    (fn [handler]
-                      #(assoc-in (handler %) [:headers "X-Middle"] "baz"))
-                    :quz
-                    (fn [handler x]
-                      #(assoc-in (handler %) [:headers "X-Middle"] (str "quz" x)))})]
+                   {:routes
+                    '{"/foo" {:get ^:baz [:foo]}
+                      "/bar" ^{:quz 9} {["/" id] {:get [:bar id]}}}
+                    :handlers
+                    {:foo
+                     (constantly {:status 200, :headers {}, :body "foo"})
+                     :bar
+                     (fn [{[_ id] :ataraxy/result}]
+                       {:status 200, :headers {}, :body (str "bar" id)})}
+                    :middleware
+                    {:baz
+                     (fn [handler]
+                       #(assoc-in (handler %) [:headers "X-Middle"] "baz"))
+                     :quz
+                     (fn [handler x]
+                       #(assoc-in (handler %) [:headers "X-Middle"] (str "quz" x)))}})]
       (is (= (handler {:request-method :get, :uri "/foo"})
              {:status 200, :headers {"X-Middle" "baz"}, :body "foo"}))
       (is (= (handler {:request-method :get, :uri "/bar/10"})
