@@ -90,8 +90,7 @@
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
 (defn- compile-match-result [{:keys [key args]} meta]
-  `{:result [~key ~@args]
-    :meta   '~(apply into {} meta)})
+  `{:result [~key ~@args]})
 
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
