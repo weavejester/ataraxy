@@ -33,7 +33,7 @@ Add the following dependency to your `project.clj` file:
     [ataraxy "0.1.2"]
 
 
-## Usage
+## Routing
 
 Ataraxy uses a data structure to tell it how to route and destructure
 requests. See the following section on [syntax](#syntax) for details.
@@ -67,6 +67,9 @@ raw data structure:
 => [:foo]
 ```
 
+
+## Handlers
+
 Once we have our routes, it's likely we want to turn them into a Ring
 handler function. Ataraxy has a function called `handler` for this
 purpose:
@@ -75,16 +78,52 @@ purpose:
 (defn foo [request]
   {:status 200, :headers {}, :body "Foo"})
 
-(defn not-found [request]
-  {:status 404, :headers {}, :body "Not found"})
-
 (def handler
-  (ataraxy/handler routes {:foo foo, :ataraxy/not-found not-found}))
+  (ataraxy/handler
+   {:routes   routes
+    :handlers {:foo foo}))
 ```
 
-This function takes two arguments; the routes and a map of keys to
-handlers. The full result will be added to the `:ataraxy/result` key
-on the request map.
+This function takes a map with three keys:
+
+* `:routes`     - the routes to match
+* `:handlers`   - a map of result keys to Ring handlers
+* `:middleware` - a map of metadata keys to Ring middleware (optional)
+
+The handler function is chosen by the key of the result. Two keys are
+added to the request map passed to the handler:
+
+* `:ataraxy/result` - contains the matched result
+* `:route-params`   - a map of parameters matched in the path
+                      (included for compatibility)
+
+Middleware is chosen based on the metadata that is applied to the
+result or to the containing routing table. For example:
+
+```clojure
+(defn wrap-example [handler value]
+  (fn [request]
+    (let [response (handler request)]
+      (assoc-in response [:header "X-Example"] value))))
+
+(def handler
+  (ataraxy/handler
+   {:routes     {"/foo" ^:example [:foo]}
+    :handlers   {:foo foo}
+    :middleware {:example #(wrap-example % "test")}}))
+```
+
+This would add an `X-Example` header to the response of the
+handler. We can also pass an argument to the handler by setting the
+`:example` metadata key to something other than `true`:
+
+```clojure
+(def handler
+  (ataraxy/handler
+   {:routes     {"/foo" ^{:example "test"} [:foo]}
+    :handlers   {:foo foo}
+    :middleware {:example wrap-example}}))
+```
 
 
 ## Syntax
