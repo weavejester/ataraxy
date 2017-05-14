@@ -89,8 +89,9 @@
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
-(defn- compile-match-result [{:keys [key args]} meta]
-  `{:result [~key ~@args]})
+(defn- compile-match-result [{:keys [key args]} meta route-params]
+  `{:result [~key ~@args]
+    :route-params ~route-params})
 
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
@@ -134,7 +135,7 @@
     next-form))
 
 (defn- path-symbols [path]
-  (into '[_] (comp (map second) (filter symbol?)) path))
+  (into [] (comp (map second) (filter symbol?)) path))
 
 (defn- path-part-regex [[_ part]]
   (if (string? part)
@@ -144,11 +145,17 @@
 (defn- path-regex [path]
   (re-pattern (str/join (map path-part-regex path))))
 
-(defn- compile-match-path [request path next-form]
+(defn- compile-route-params [route-params path]
+  (if-let [syms (seq (path-symbols path))]
+    `(assoc ~route-params ~@(mapcat (juxt keyword identity) syms))
+    route-params))
+
+(defn- compile-match-path [request path route-params next-form]
   (if (some? path)
     `(let [path-info# (or (:path-info ~request) (:uri ~request))]
-       (if-let [~(path-symbols path) (re-matches ~(path-regex path) path-info#)]
-         ~next-form
+       (if-let [~(path-symbols path) (next (re-matches ~(path-regex path) path-info#))]
+         (let [~route-params ~(compile-route-params route-params path)]
+           ~next-form)
          {:result [::err/unmatched-path]}))
     next-form))
 
@@ -160,11 +167,13 @@
     next-form))
 
 (defn- compile-match-route [request {:keys [method path params destruct result meta]}]
-  (->> (compile-match-result result meta)
-       (compile-match-destruct request destruct)
-       (compile-match-params request params)
-       (compile-match-method request method)
-       (compile-match-path request path)))
+  (let [route-params (gensym "route-params")]
+    `(let [~route-params {}]
+       ~(->> (compile-match-result result meta route-params)
+             (compile-match-destruct request destruct)
+             (compile-match-params request params)
+             (compile-match-method request method)
+             (compile-match-path request path route-params)))))
 
 (defn best-result [a b]
   (if-let [fa (err/errors (first a))]
@@ -210,8 +219,10 @@
 (defn result-keys [routes]
   (map (comp :key :result) (parse routes)))
 
-(defn- assoc-result [request result]
-  (assoc request :ataraxy/result result))
+(defn- assoc-match [request result route-params]
+  (assoc request
+         :ataraxy/result result
+         :route-params   route-params))
 
 (defn- result-metadata [routes]
   (->> (parse routes)
@@ -240,10 +251,10 @@
         routes   (compile routes)]
     (fn
       ([request]
-       (let [result  (matches routes request)
+       (let [{:keys [result route-params]} (-matches routes request)
              handler (handlers (first result) default)]
-         (handler (assoc-result request result))))
+         (handler (assoc-match request result route-params))))
       ([request respond raise]
-       (let [result  (matches routes request)
+       (let [{:keys [result route-params]} (-matches routes request)
              handler (handlers (first result) default)]
-         (handler (assoc-result request result) respond raise))))))
+         (handler (assoc-match request result route-params) respond raise))))))

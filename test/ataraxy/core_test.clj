@@ -191,4 +191,15 @@
       (is (= (handler {:request-method :get, :uri "/baz"})
              {:status  404
               :headers {"Content-Type" "text/plain; charset=UTF-8"}
-              :body    "Not Found"})))))
+              :body    "Not Found"}))))
+
+  (testing "route parameters"
+    (let [handler (ataraxy/handler
+                   {:routes
+                    '{[:get "/user/" uid "/post/" pid] [:user-post uid pid]}
+                    :handlers
+                    {:user-post
+                     (fn [{params :route-params}]
+                       {:status 200, :headers {}, :body params})}})]
+      (is (= (handler {:request-method :get, :uri "/user/alice/post/5"})
+             {:status 200, :headers {}, :body {:uid "alice" :pid "5"}})))))
