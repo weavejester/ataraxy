@@ -49,7 +49,7 @@
 (s/def ::routing-table
   (s/and (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
                :ordered   (s/and list? (s/* ::route-result)))
-          distinct-result-keys?))
+         distinct-result-keys?))
 
 (s/def ::routing-table-with-meta
   (s/and ::with-meta (s/cat :value ::routing-table, :meta (s/nilable map?))))
