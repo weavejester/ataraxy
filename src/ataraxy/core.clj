@@ -89,9 +89,26 @@
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
+(defmulti coerce
+  (fn [x tag] [(type x) tag]))
+
+(defmethod coerce [String 'int] [s _]
+  (try (Long/parseLong s) (catch NumberFormatException _)))
+
+(defn- compile-coercion [sym]
+  (if-let [tag (-> sym meta :tag)]
+    [sym `(coerce ~sym '~tag)]))
+
+(defn- missing-symbol-set [symbols]
+  `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
+
 (defn- compile-match-result [{:keys [key args]} meta route-params]
-  `{:result [~key ~@args]
-    :route-params ~route-params})
+  (let [coercions (into {} (keep compile-coercion args))]
+    `(let [~@(apply concat coercions)]
+       {:route-params ~route-params
+        :result (if (and ~@(keys coercions))
+                  [~key ~@args]
+                  [::err/failed-coercions ~(missing-symbol-set args)])})))
 
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
@@ -105,9 +122,6 @@
   (cond
     (coll? x)   (mapcat find-symbols x)
     (symbol? x) (list x)))
-
-(defn- missing-symbol-set [symbols]
-  `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
 
 (defn- compile-match-destruct [request destructs next-form]
   (if (some? destructs)

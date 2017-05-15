@@ -4,7 +4,8 @@
   {::unmatched-path   0
    ::unmatched-method 1
    ::missing-params   2
-   ::missing-destruct 3})
+   ::missing-destruct 3
+   ::failed-coercions 4})
 
 (defn error-result? [result]
   (contains? errors (first result)))
@@ -13,7 +14,8 @@
   {::unmatched-path   {:status 404, :body "Not Found"}
    ::unmatched-method {:status 405, :body "Method Not Allowed"}
    ::missing-params   {:status 400, :body "Bad Request"}
-   ::missing-destruct {:status 400, :body "Bad Request"}})
+   ::missing-destruct {:status 400, :body "Bad Request"}
+   ::failed-coercions {:status 400, :body "Bad Request"}})
 
 (def ^:private common-headers
   {"Content-Type" "text/plain; charset=UTF-8"})

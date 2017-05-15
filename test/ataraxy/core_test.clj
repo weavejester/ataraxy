@@ -105,12 +105,20 @@
         {:request-method :get, :uri "/foo/10"} [:bar "10"]
         {:request-method :put, :uri "/foo"}    [::err/unmatched-method])))
 
+  (testing "coercions"
+    (let [routes '{["/foo/" id] [:foo ^int id]}]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:request-method :get, :uri "/foo/10"} [:foo 10]
+        {:request-method :get, :uri "/foo/xx"} [::err/failed-coercions '#{id}])))
+
   (testing "error results"
-    (let [routes '{[:get "/foo/" id #{page}] [:foo id page]}]
+    (let [routes '{[:get "/foo/" id #{page}] [:foo id ^int page]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :put, :uri "/foo"}    [::err/unmatched-path]
         {:request-method :put, :uri "/foo/10"} [::err/unmatched-method]
-        {:request-method :get, :uri "/foo/10"} [::err/missing-params '#{page}]))))
+        {:request-method :get, :uri "/foo/10"} [::err/missing-params '#{page}]
+        {:request-method :get, :uri "/foo/10"
+         :query-params {"page" "x"}}           [::err/failed-coercions '#{page}]))))
 
 (deftest test-handler
   (testing "synchronous handler"
