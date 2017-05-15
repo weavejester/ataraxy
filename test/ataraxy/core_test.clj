@@ -208,6 +208,11 @@
                     :handlers
                     {:user-post
                      (fn [{params :route-params}]
-                       {:status 200, :headers {}, :body params})}})]
+                       {:status 200, :headers {}, :body params})
+                     ::err/unmatched-method
+                     (fn [{params :route-params}]
+                       {:status 405, :headers {}, :body params})}})]
       (is (= (handler {:request-method :get, :uri "/user/alice/post/5"})
-             {:status 200, :headers {}, :body {:uid "alice" :pid "5"}})))))
+             {:status 200, :headers {}, :body {:uid "alice" :pid "5"}}))
+      (is (= (handler {:request-method :put, :uri "/user/alice/post/5"})
+             {:status 405, :headers {}, :body {:uid "alice" :pid "5"}})))))

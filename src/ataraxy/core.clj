@@ -102,13 +102,12 @@
 (defn- missing-symbol-set [symbols]
   `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
 
-(defn- compile-match-result [{:keys [key args]} meta route-params]
+(defn- compile-match-result [{:keys [key args]} meta result-form]
   (let [coercions (into {} (keep compile-coercion args))]
     `(let [~@(apply concat coercions)]
-       {:route-params ~route-params
-        :result (if (and ~@(keys coercions))
-                  [~key ~@args]
-                  [::err/failed-coercions ~(missing-symbol-set args)])})))
+       (if (and ~@(keys coercions))
+         ~(result-form (into [key] args))
+         ~(result-form [::err/failed-coercions (missing-symbol-set args)])))))
 
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
@@ -123,13 +122,13 @@
     (coll? x)   (mapcat find-symbols x)
     (symbol? x) (list x)))
 
-(defn- compile-match-destruct [request destructs next-form]
+(defn- compile-match-destruct [request destructs result-form next-form]
   (if (some? destructs)
     (let [mandatory (remove optional-binding? (find-symbols destructs))]
       `(let [~@(mapcat #(vector % request) destructs)]
          (if (and ~@mandatory)
            ~next-form
-           {:result [::err/missing-destruct ~(missing-symbol-set mandatory)]})))
+           ~(result-form [::err/missing-destruct (missing-symbol-set mandatory)]))))
     next-form))
 
 (defn- param-match-binding [request param]
@@ -138,14 +137,14 @@
                 (get (:form-params ~request) ~key)
                 (get (:multipart-params ~request) ~key))]))
 
-(defn- compile-match-params [request params next-form]
+(defn- compile-match-params [request params result-form next-form]
   (if (some? params)
     (let [params    (apply set/union params)
           mandatory (remove optional-binding? params)]
       `(let [~@(mapcat (partial param-match-binding request) params)]
          (if (and ~@mandatory)
            ~next-form
-           {:result [::err/missing-params ~(missing-symbol-set mandatory)]})))
+           ~(result-form [::err/missing-params (missing-symbol-set mandatory)]))))
     next-form))
 
 (defn- path-symbols [path]
@@ -164,54 +163,54 @@
     `(assoc ~route-params ~@(mapcat (juxt keyword identity) syms))
     route-params))
 
-(defn- compile-match-path [request path route-params next-form]
+(defn- compile-match-path [request path route-params result-form next-form]
   (if (some? path)
     `(let [path-info# (or (:path-info ~request) (:uri ~request))]
        (if-let [~(path-symbols path) (next (re-matches ~(path-regex path) path-info#))]
          (let [~route-params ~(compile-route-params route-params path)]
            ~next-form)
-         {:result [::err/unmatched-path]}))
+         ~(result-form [::err/unmatched-path])))
     next-form))
 
-(defn- compile-match-method [request method next-form]
+(defn- compile-match-method [request method result-form next-form]
   (if (some? method)
     `(if (= ~(first method) (:request-method ~request))
        ~next-form
-       {:result [::err/unmatched-method]})
+       ~(result-form [::err/unmatched-method]))
     next-form))
 
 (defn- compile-match-route [request {:keys [method path params destruct result meta]}]
-  (let [route-params (gensym "route-params")]
+  (let [route-params (gensym "route-params")
+        result-form  (fn [result] {:route-params route-params, :result result})]
     `(let [~route-params {}]
-       ~(->> (compile-match-result result meta route-params)
-             (compile-match-destruct request destruct)
-             (compile-match-params request params)
-             (compile-match-method request method)
-             (compile-match-path request path route-params)))))
+       ~(->> (compile-match-result result meta result-form)
+             (compile-match-destruct request destruct result-form)
+             (compile-match-params request params result-form)
+             (compile-match-method request method result-form)
+             (compile-match-path request path route-params result-form)))))
 
-(defn best-result [a b]
-  (if-let [fa (err/errors (first a))]
-    (if-let [fb (err/errors (first b))]
+(defn best-match [a b]
+  (if-let [fa (err/errors (first (:result a)))]
+    (if-let [fb (err/errors (first (:result b)))]
       (if (>= fa fb) a b)
       b)
     a))
 
-(defn- compile-match-route-seq [request result routes]
+(defn- compile-match-route-seq [request match routes]
   (if (seq routes)
     (let [route (first routes)]
-      `(let [match# ~(compile-match-route request route)
-             ~result (best-result ~result (:result match#))]
-         (if (err/error-result? ~result)
-           ~(compile-match-route-seq request result (rest routes))
-           match#)))
-    {:result result}))
+      `(let [~match (best-match ~match ~(compile-match-route request route))]
+         (if (err/error-result? (:result ~match))
+           ~(compile-match-route-seq request match (rest routes))
+           ~match)))
+    match))
 
 (defn compile-match [routes]
   (let [request (gensym "request")
-        result  (gensym "result")]
+        match   (gensym "match")]
     `(fn [~request]
-       (let [~result [::err/unmatched-path]]
-         ~(compile-match-route-seq request result (parse routes))))))
+       (let [~match {:result [::err/unmatched-path]}]
+         ~(compile-match-route-seq request match (parse routes))))))
 
 (defprotocol Routes
   (-matches [routes request]))
