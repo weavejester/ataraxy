@@ -89,24 +89,15 @@
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
-(defmulti coerce
-  (fn [x tag] [(type x) tag]))
-
-(defmethod coerce [String 'int] [s _]
-  (try (Long/parseLong s) (catch NumberFormatException _)))
-
-(defmethod coerce [String 'uuid] [s _]
-  (try (java.util.UUID/fromString s) (catch IllegalArgumentException _)))
-
-(defn- compile-coercion [sym]
+(defn- compile-coercion [coercers sym]
   (if-let [tag (-> sym meta :tag)]
-    [sym `(coerce ~sym '~tag)]))
+    [sym `((~coercers '~tag) ~sym)]))
 
 (defn- missing-symbol-set [symbols]
   `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
 
-(defn- compile-match-result [{:keys [key args]} meta result-form]
-  (let [coercions (into {} (keep compile-coercion args))]
+(defn- compile-match-result [{:keys [key args]} meta coercers result-form]
+  (let [coercions (into {} (keep (partial compile-coercion coercers) args))]
     `(let [~@(apply concat coercions)]
        (if (and ~@(keys coercions))
          ~(result-form (into [key] args))
@@ -182,11 +173,12 @@
        ~(result-form [::err/unmatched-method]))
     next-form))
 
-(defn- compile-match-route [request {:keys [method path params destruct result meta]}]
+(defn- compile-match-route
+  [request coercers {:keys [method path params destruct result meta]}]
   (let [route-params (gensym "route-params")
         result-form  (fn [result] {:route-params route-params, :result result})]
     `(let [~route-params {}]
-       ~(->> (compile-match-result result meta result-form)
+       ~(->> (compile-match-result result meta coercers result-form)
              (compile-match-destruct request destruct result-form)
              (compile-match-params request params result-form)
              (compile-match-method request method result-form)
@@ -199,35 +191,49 @@
       b)
     a))
 
-(defn- compile-match-route-seq [request match routes]
+(defn- compile-match-route-seq [request match coercers routes]
   (if (seq routes)
     (let [route (first routes)]
-      `(let [~match (best-match ~match ~(compile-match-route request route))]
+      `(let [~match (best-match ~match ~(compile-match-route request coercers route))]
          (if (err/error-result? (:result ~match))
-           ~(compile-match-route-seq request match (rest routes))
+           ~(compile-match-route-seq request match coercers (rest routes))
            ~match)))
     match))
 
-(defn compile-match [routes]
+(defn compile-match [routes coercers]
   (let [request (gensym "request")
         match   (gensym "match")]
     `(fn [~request]
        (let [~match {:result [::err/unmatched-path]}]
-         ~(compile-match-route-seq request match (parse routes))))))
+         ~(compile-match-route-seq request match coercers (parse routes))))))
 
 (defprotocol Routes
   (-matches [routes request]))
 
-(defmacro compile* [routes]
+(defmacro compile* [routes coercers]
   {:pre [(valid? routes)]}
-  `(let [matches# ~(compile-match routes)]
-     (reify Routes
-       (-matches [_ request#] (matches# request#)))))
+  (let [coercers-sym (gensym "coercers")]
+    `(let [~coercers-sym ~(into {} (for [[k v] coercers] `['~k ~v]))
+           matches#      ~(compile-match routes coercers-sym)]
+       (reify Routes
+         (-matches [_ request#] (matches# request#))))))
 
-(defn compile [routes]
-  (if (satisfies? Routes routes)
-    routes
-    (eval `(compile* ~routes))))
+(defn ->int [s]
+  (try (Long/parseLong s) (catch NumberFormatException _)))
+
+(defn ->uuid [s]
+  (try (java.util.UUID/fromString s) (catch IllegalArgumentException _)))
+
+(def default-coercers
+  {'int  ->int
+   'uuid ->uuid})
+
+(defn compile
+  ([routes] (compile routes {}))
+  ([routes coercers]
+   (if (satisfies? Routes routes)
+     routes
+     (eval `(compile* ~routes ~(merge default-coercers coercers))))))
 
 (defn matches [routes request]
   (:result (-matches (compile routes) request)))
@@ -260,11 +266,11 @@
     (into {} (map (juxt key wrap-handler) handler-map))))
 
 (defn handler
-  [{:keys [routes handlers middleware]}]
+  [{:keys [routes handlers middleware coercers]}]
   {:pre [(set/subset? (set (result-keys routes)) (set (keys handlers)))]}
   (let [handlers (wrap-handler-map handlers routes middleware)
         default  (:default handlers err/default-handler)
-        routes   (compile routes)]
+        routes   (compile routes coercers)]
     (fn
       ([request]
        (let [{:keys [result route-params]} (-matches routes request)

@@ -118,6 +118,14 @@
         {:request-method :get, :uri "/bar/5eae6ec3"}
         [::err/failed-coercions '#{id}])))
 
+  (testing "custom coercers"
+    (let [routes (ataraxy/compile
+                  '{["/foo/" id] [:foo ^second id]}
+                  {'second second})]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:request-method :get, :uri "/foo/bar"} [:foo \a]
+        {:request-method :get, :uri "/foo/b"}   [::err/failed-coercions '#{id}])))
+
   (testing "error results"
     (let [routes '{[:get "/foo/" id #{page}] [:foo id ^int page]}]
       (are [req res] (= (ataraxy/matches routes req) res)
