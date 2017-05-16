@@ -95,6 +95,9 @@
 (defmethod coerce [String 'int] [s _]
   (try (Long/parseLong s) (catch NumberFormatException _)))
 
+(defmethod coerce [String 'uuid] [s _]
+  (try (java.util.UUID/fromString s) (catch IllegalArgumentException _)))
+
 (defn- compile-coercion [sym]
   (if-let [tag (-> sym meta :tag)]
     [sym `(coerce ~sym '~tag)]))

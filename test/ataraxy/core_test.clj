@@ -106,10 +106,17 @@
         {:request-method :put, :uri "/foo"}    [::err/unmatched-method])))
 
   (testing "coercions"
-    (let [routes '{["/foo/" id] [:foo ^int id]}]
+    (let [routes '{["/foo/" id] [:foo ^int id]
+                   ["/bar/" id] [:bar ^uuid id]}]
       (are [req res] (= (ataraxy/matches routes req) res)
         {:request-method :get, :uri "/foo/10"} [:foo 10]
-        {:request-method :get, :uri "/foo/xx"} [::err/failed-coercions '#{id}])))
+        {:request-method :get, :uri "/foo/xx"} [::err/failed-coercions '#{id}]
+
+        {:request-method :get, :uri "/bar/5eae6ec3-f4eb-477e-b255-a6dd686bb697"}
+        [:bar #uuid "5eae6ec3-f4eb-477e-b255-a6dd686bb697"]
+
+        {:request-method :get, :uri "/bar/5eae6ec3"}
+        [::err/failed-coercions '#{id}])))
 
   (testing "error results"
     (let [routes '{[:get "/foo/" id #{page}] [:foo id ^int page]}]
