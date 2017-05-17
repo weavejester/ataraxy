@@ -26,6 +26,18 @@ declarative data structure.
 [compojure]: https://github.com/weavejester/compojure
 
 
+## Example
+
+```clojure
+{["/api" {uid :identity}]
+ {"/products"
+   {[:get]                [:products/list uid]
+    [:get "/" pid]        [:products/get uid ^uuid pid]
+    [:get "/search" #{q}] [:products/search uid q]
+    [:post {body :body}]  [:products/new uid body]}}}
+```
+
+
 ## Installation
 
 Add the following dependency to your `project.clj` file:
