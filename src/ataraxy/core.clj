@@ -1,6 +1,7 @@
 (ns ataraxy.core
   (:refer-clojure :exclude [compile])
   (:require [ataraxy.error :as err]
+            [ataraxy.coerce :as coerce]
             [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
@@ -218,22 +219,12 @@
        (reify Routes
          (-matches [_ request#] (matches# request#))))))
 
-(defn ->int [s]
-  (try (Long/parseLong s) (catch NumberFormatException _)))
-
-(defn ->uuid [s]
-  (try (java.util.UUID/fromString s) (catch IllegalArgumentException _)))
-
-(def default-coercers
-  {'int  ->int
-   'uuid ->uuid})
-
 (defn compile
   ([routes] (compile routes {}))
   ([routes coercers]
    (if (satisfies? Routes routes)
      routes
-     (eval `(compile* ~routes ~(merge default-coercers coercers))))))
+     (eval `(compile* ~routes ~(merge coerce/default-coercers coercers))))))
 
 (defn matches [routes request]
   (:result (-matches (compile routes) request)))
