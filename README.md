@@ -30,7 +30,7 @@ declarative data structure.
 
 Add the following dependency to your `project.clj` file:
 
-    [ataraxy "0.2.0"]
+    [ataraxy "0.2.1"]
 
 
 ## Routing
