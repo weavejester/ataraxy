@@ -89,6 +89,7 @@ This function takes a map with three keys:
 * `:routes`     - the routes to match
 * `:handlers`   - a map of result keys to Ring handlers
 * `:middleware` - a map of metadata keys to Ring middleware (optional)
+* `:coercers`   - a map of symbols to coercer functions (optional)
 
 The handler function is chosen by the key of the result. Two keys are
 added to the request map passed to the handler:
@@ -125,6 +126,10 @@ handler. We can also pass an argument to the handler by setting the
     :middleware {:example wrap-example}}))
 ```
 
+Custom coercers can be added to the handler by specifying the
+`:coercers` option. This is described in more detail in
+the [coercers](#coercers) section.
+
 
 ## Syntax
 
@@ -134,8 +139,7 @@ map, or a list of alternating keys and values.
 The keys of the table are **routes**, and the data type used defines a
 way of matching and destructuring a request.
 
-The values are either **results** or nested tables. Results are always
-vectors, beginning with a keyword.
+The values are either **results** or nested tables.
 
 Here's a semi-formal definition of the syntax:
 
@@ -144,6 +148,32 @@ table  = {<route result>+} | (<route result>+)
 route  = keyword | string | symbol | set | map | [route+]
 result = table | [keyword symbol*]
 ```
+
+### Results
+
+Results are always vectors, beginning with a keyword, followed by zero
+or more symbols. For example:
+
+```clojure
+[:foo id]
+```
+
+Results are paired with routes:
+
+```clojure
+{["/foo/" id] [:foo id]}
+```
+
+The symbols in the route are passed into the result.
+
+The symbols in the result may be tagged with a type they should be
+coerced into. For example:
+
+```clojure
+[:foo ^int id]
+```
+
+See the [coercers](#coercers) section for more detail.
 
 ### Keyword routes
 
@@ -262,6 +292,42 @@ You can also use nesting and vectors together:
 {["/user/" name]
  {:get [:get-user name]
   :put [:put-user name]}}
+```
+
+
+## Coercers
+
+Coercers are functions that turn a string into a custom type. Any
+symbol in the result can be tagged with a symbol associated with a
+coercer function.
+
+For example, it's common to want to change a parameter from a string
+into an int:
+
+```clojure
+{[:get "/foo/" id] [:foo ^int id]}
+```
+
+The `int` and `uuid` coercers are included by default. We can easily
+add our own, however:
+
+```clojure
+(defn ->float [s]
+  (try (Double/parseDouble s) (catch NumberFormatException _)))
+
+(def compiled-routes
+  (ataraxy/compile
+   '{[:get "/foo/" id] [:foo ^float id]}
+   {'float ->float}))
+```
+
+And similarly to handlers:
+
+```clojure
+(def handler
+  (ataraxy/handler
+   {:routes   '{[:get "/foo/" id] [:foo ^float id]}
+    :coercers {'float ->float}}))
 ```
 
 
