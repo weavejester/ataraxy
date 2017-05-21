@@ -1,7 +1,9 @@
 (ns ataraxy.core
   (:refer-clojure :exclude [compile])
-  (:require [ataraxy.error :as err]
-            [ataraxy.coerce :as coerce]
+  (:require [ataraxy.coerce :as coerce]
+            [ataraxy.error :as err]
+            [ataraxy.handler :as handler]
+            [ataraxy.response :as response]
             [clojure.set :as set]
             [clojure.spec.alpha :as s]
             [clojure.core.specs.alpha :as specs]
@@ -256,18 +258,34 @@
         wrap-handler (fn [[k h]] (wrap-handler h k metadata-map middleware-map))]
     (into {} (map (juxt key wrap-handler) handler-map))))
 
+(defn- apply-handler
+  ([get-handler request]
+   (let [handler  (get-handler request)
+         response (handler request)]
+     (if (vector? response)
+       (recur get-handler (assoc request :ataraxy/result response))
+       response)))
+  ([get-handler request respond raise]
+   (let [handler (get-handler request)]
+     (handler request
+              #(if (vector? %)
+                (apply-handler get-handler (assoc request :ataraxy/result %) respond raise)
+                (respond %))
+              raise))))
+
 (defn handler
   [{:keys [routes handlers middleware coercers]}]
   {:pre [(set/subset? (set (result-keys routes)) (set (keys handlers)))]}
-  (let [handlers (wrap-handler-map handlers routes middleware)
-        default  (:default handlers err/default-handler)
-        routes   (compile routes coercers)]
+  (let [handlers    (wrap-handler-map handlers routes middleware)
+        default     (:default handlers handler/default)
+        get-handler (fn [req] (handlers (first (:ataraxy/result req)) default))
+        routes      (compile routes coercers)]
     (fn
       ([request]
        (let [{:keys [result route-params]} (-matches routes request)
-             handler (handlers (first result) default)]
-         (handler (assoc-match request result route-params))))
+             request (assoc-match request result route-params)]
+         (apply-handler get-handler request)))
       ([request respond raise]
        (let [{:keys [result route-params]} (-matches routes request)
-             handler (handlers (first result) default)]
-         (handler (assoc-match request result route-params) respond raise))))))
+             request (assoc-match request result route-params)]
+         (apply-handler get-handler request respond raise))))))

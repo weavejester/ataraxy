@@ -1,7 +1,8 @@
 (ns ataraxy.core-test
   (:require [clojure.test :refer :all]
             [ataraxy.core :as ataraxy]
-            [ataraxy.error :as err]))
+            [ataraxy.error :as err]
+            [ataraxy.response :as response]))
 
 (deftest test-valid?
   (are [x y] (= (ataraxy/valid? x) y)
@@ -153,11 +154,11 @@
              {:status 200, :headers {}, :body "barbaz"}))
       (is (= (handler {:request-method :get, :uri "/baz"})
              {:status  404
-              :headers {"Content-Type" "text/plain; charset=UTF-8"}
+              :headers {}
               :body    "Not Found"}))
       (is (= (handler {:request-method :put, :uri "/foo"})
              {:status  405
-              :headers {"Content-Type" "text/plain; charset=UTF-8"}
+              :headers {}
               :body    "Method Not Allowed"}))))
 
   (testing "asynchronous handler"
@@ -181,12 +182,12 @@
       (let [respond (promise), raise (promise)]
         (handler {:request-method :get, :uri "/baz"} respond raise)
         (is (= @respond {:status  404
-                         :headers {"Content-Type" "text/plain; charset=UTF-8"}
+                         :headers {}
                          :body    "Not Found"})))
       (let [respond (promise), raise (promise)]
         (handler {:request-method :put, :uri "/foo"} respond raise)
         (is (= @respond {:status  405
-                         :headers {"Content-Type" "text/plain; charset=UTF-8"}
+                         :headers {}
                          :body    "Method Not Allowed"})))))
 
   (testing "middleware"
@@ -213,7 +214,7 @@
              {:status 200, :headers {"X-Middle" "quz9"}, :body "bar10"}))
       (is (= (handler {:request-method :get, :uri "/baz"})
              {:status  404
-              :headers {"Content-Type" "text/plain; charset=UTF-8"}
+              :headers {}
               :body    "Not Found"}))))
 
   (testing "route parameters"
@@ -230,4 +231,13 @@
       (is (= (handler {:request-method :get, :uri "/user/alice/post/5"})
              {:status 200, :headers {}, :body {:uid "alice" :pid "5"}}))
       (is (= (handler {:request-method :put, :uri "/user/alice/post/5"})
-             {:status 405, :headers {}, :body {:uid "alice" :pid "5"}})))))
+             {:status 405, :headers {}, :body {:uid "alice" :pid "5"}}))))
+
+  (testing "variant responses"
+    (let [handler (ataraxy/handler
+                   {:routes   '{[:get "/foo/" id] [:foo id]}
+                    :handlers {:foo
+                               (fn [{[_ id] :ataraxy/result}]
+                                 [::response/ok (str "id=" id)])}})]
+      (is (= (handler {:request-method :get, :uri "/foo/bar"})
+             {:status 200, :headers {}, :body "id=bar"})))))

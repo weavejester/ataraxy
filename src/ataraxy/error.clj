@@ -1,4 +1,6 @@
-(ns ataraxy.error)
+(ns ataraxy.error
+  (:require [ataraxy.handler :as handler]
+            [ataraxy.response :as response]))
 
 (def errors
   {::unmatched-path   0
@@ -10,20 +12,17 @@
 (defn error-result? [result]
   (contains? errors (first result)))
 
-(def responses
-  {::unmatched-path   {:status 404, :body "Not Found"}
-   ::unmatched-method {:status 405, :body "Method Not Allowed"}
-   ::missing-params   {:status 400, :body "Bad Request"}
-   ::missing-destruct {:status 400, :body "Bad Request"}
-   ::failed-coercions {:status 400, :body "Bad Request"}})
+(defmethod handler/sync-default ::unmatched-path [_]
+  [::response/not-found "Not Found"])
 
-(def ^:private common-headers
-  {"Content-Type" "text/plain; charset=UTF-8"})
+(defmethod handler/sync-default ::unmatched-method [_]
+  [::response/method-not-allowed "Method Not Allowed"])
 
-(defn default-handler
-  ([request]
-   (let [key  (first (:ataraxy/result request))
-         resp (responses key ::unmatched-path)]
-     (assoc resp :headers common-headers)))
-  ([request respond raise]
-   (respond (default-handler request))))
+(defmethod handler/sync-default ::missing-params [_]
+  [::response/bad-request "Bad Request"])
+
+(defmethod handler/sync-default ::missing-destruct [_]
+  [::response/bad-request "Bad Request"])
+
+(defmethod handler/sync-default ::failed-coercions [_]
+  [::response/bad-request "Bad Request"])
