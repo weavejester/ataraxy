@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [ataraxy.core :as ataraxy]
             [ataraxy.error :as err]
-            [ataraxy.response :as response]))
+            [ataraxy.response :as response]
+            [clojure.java.io :as io]))
 
 (deftest test-valid?
   (are [x y] (= (ataraxy/valid? x) y)
@@ -154,11 +155,11 @@
              {:status 200, :headers {}, :body "barbaz"}))
       (is (= (handler {:request-method :get, :uri "/baz"})
              {:status  404
-              :headers {}
+              :headers {"Content-Type" "text/html; charset=UTF-8"}
               :body    "Not Found"}))
       (is (= (handler {:request-method :put, :uri "/foo"})
              {:status  405
-              :headers {}
+              :headers {"Content-Type" "text/html; charset=UTF-8"}
               :body    "Method Not Allowed"}))))
 
   (testing "asynchronous handler"
@@ -182,12 +183,12 @@
       (let [respond (promise), raise (promise)]
         (handler {:request-method :get, :uri "/baz"} respond raise)
         (is (= @respond {:status  404
-                         :headers {}
+                         :headers {"Content-Type" "text/html; charset=UTF-8"}
                          :body    "Not Found"})))
       (let [respond (promise), raise (promise)]
         (handler {:request-method :put, :uri "/foo"} respond raise)
         (is (= @respond {:status  405
-                         :headers {}
+                         :headers {"Content-Type" "text/html; charset=UTF-8"}
                          :body    "Method Not Allowed"})))))
 
   (testing "middleware"
@@ -214,7 +215,7 @@
              {:status 200, :headers {"X-Middle" "quz9"}, :body "bar10"}))
       (is (= (handler {:request-method :get, :uri "/baz"})
              {:status  404
-              :headers {}
+              :headers {"Content-Type" "text/html; charset=UTF-8"}
               :body    "Not Found"}))))
 
   (testing "route parameters"
@@ -240,4 +241,27 @@
                                (fn [{[_ id] :ataraxy/result}]
                                  [::response/ok (str "id=" id)])}})]
       (is (= (handler {:request-method :get, :uri "/foo/bar"})
-             {:status 200, :headers {}, :body "id=bar"})))))
+             {:status  200
+              :headers {"Content-Type" "text/html; charset=UTF-8"}
+              :body    "id=bar"}))))
+
+  (testing "resource responses"
+    (let [resource (io/resource "ataraxy/foo.txt")
+          handler  (ataraxy/handler
+                     {:routes   '{[:get "/foo"] [:foo]}
+                      :handlers {:foo (fn [_] [::response/ok resource])}})
+          response (handler {:request-method :get, :uri "/foo"})]
+      (is (= (:status response) 200))
+      (is (= (get-in response [:headers "Content-Type"]) "text/plain"))
+      (is (instance? java.io.File (:body response)))
+      (is (= (slurp (:body response)) (slurp resource)))))
+
+  (testing "file responses"
+    (let [file     (io/file "test/ataraxy/foo.txt")
+          handler  (ataraxy/handler
+                     {:routes   '{[:get "/foo"] [:foo]}
+                      :handlers {:foo (fn [_] [::response/ok file])}})
+          response (handler {:request-method :get, :uri "/foo"})]
+      (is (= (:status response) 200))
+      (is (= (get-in response [:headers "Content-Type"]) "text/plain"))
+      (is (= (:body response) file)))))
