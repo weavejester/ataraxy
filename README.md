@@ -110,6 +110,28 @@ added to the request map passed to the handler:
 * `:route-params`   - a map of parameters matched in the path
                       (included for compatibility)
 
+The handler can also return a result vector instead of a request
+map. Each vector that is returned is checked against the handler map,
+until eventually a Ring response map is returnd.
+
+The `ataraxy.response` namespace defines a number of responses on
+the default handler, allowing for code like this:
+
+```clojure
+(require '[ataraxy.response :as response])
+
+(defn hello [{[_ name] :ataraxy/result}]
+  [::response/ok (str "Hello " name)])
+
+(def handler
+  (ataraxy/handler
+    {:routes   {[:get "/hello/" name] [:hello name]}
+     :handlers {:hello hello}}))
+```
+
+The default handler is set to `ataraxy.handler/default`, but can be
+changed by adding a handler to the `:default` key of the handler map.
+
 Middleware is chosen based on the metadata that is applied to the
 result or to the containing routing table. For example:
 
