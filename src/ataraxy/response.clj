@@ -1,4 +1,6 @@
 (ns ataraxy.response
+  "A namespace that contains Ataraxy's standard responses, and adds default
+  handler methods for each one."
   (:require [ataraxy.handler :as handler]
             [ring.util.mime-type :as mime]
             [ring.util.response :as resp]))
@@ -9,7 +11,9 @@
     response))
 
 (defprotocol ToResponse
-  (->response [x]))
+  "A protocol used to transform a value into a response map."
+  (->response [x]
+    "Turn its argument into a valid Ring response map."))
 
 (extend-protocol ToResponse
   String

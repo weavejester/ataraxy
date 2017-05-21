@@ -1,4 +1,6 @@
 (ns ataraxy.core
+  "The core Ataraxy namespace. Includes functions for compiling and matching
+  routes, and for building a Ring handler function."
   (:refer-clojure :exclude [compile])
   (:require [ataraxy.coerce :as coerce]
             [ataraxy.error :as err]
@@ -57,7 +59,9 @@
 (s/def ::routing-table-with-meta
   (s/and ::with-meta (s/cat :value ::routing-table, :meta (s/nilable map?))))
 
-(defn valid? [routes]
+(defn valid?
+  "Return true if the routes data structure is valid."
+  [routes]
   (s/valid? ::routing-table-with-meta routes))
 
 (defn- parse-single-route [context [type value]]
@@ -88,7 +92,10 @@
 (defn- parse-routing-table [context {[_ routes] :value, meta :meta}]
   (mapcat (partial parse-route-result (update-meta context meta)) routes))
 
-(defn parse [routes]
+(defn parse
+  "Parse the routes into an ordered sequence of maps that's more covenient to
+  work with. Each map represents a route. Nested routes are flattened."
+  [routes]
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
@@ -187,7 +194,7 @@
              (compile-match-method request method result-form)
              (compile-match-path request path route-params result-form)))))
 
-(defn best-match [a b]
+(defn ^:no-doc best-match [a b]
   (if-let [fa (err/errors (first (:result a)))]
     (if-let [fb (err/errors (first (:result b)))]
       (if (>= fa fb) a b)
@@ -203,17 +210,17 @@
            ~match)))
     match))
 
-(defn compile-match [routes coercers]
+(defn ^:no-doc compile-match [routes coercers]
   (let [request (gensym "request")
         match   (gensym "match")]
     `(fn [~request]
        (let [~match {:result [::err/unmatched-path]}]
          ~(compile-match-route-seq request match coercers (parse routes))))))
 
-(defprotocol Routes
+(defprotocol ^:no-doc Routes
   (-matches [routes request]))
 
-(defmacro compile* [routes coercers]
+(defmacro ^:no-doc compile* [routes coercers]
   {:pre [(valid? routes)]}
   (let [coercers-sym (gensym "coercers")]
     `(let [~coercers-sym ~(into {} (for [[k v] coercers] `['~k ~v]))
@@ -222,13 +229,17 @@
          (-matches [_ request#] (matches# request#))))))
 
 (defn compile
+  "Compile a data structure of routes into an object for performance."
   ([routes] (compile routes {}))
   ([routes coercers]
    (if (satisfies? Routes routes)
      routes
      (eval `(compile* ~routes ~(merge coerce/default-coercers coercers))))))
 
-(defn matches [routes request]
+(defn matches
+  "Check if any route matches the supplied request. If a route does match, the
+  associated result vector is returned."
+  [routes request]
   (:result (-matches (compile routes) request)))
 
 (defn result-keys [routes]
@@ -274,6 +285,16 @@
               raise))))
 
 (defn handler
+  "Create a handler from a data structure of routes and a map of result keys to
+  handler functions. If no handler matches, the :default handler is used. If no
+  default handler is set, the ataraxy.handler/default function is used.
+
+  Optionally, maps of middleware and coercer functions can also be supplied.
+  Middleware is applied to any result with metadata matching the key in the
+  middleware map. Coercers are applied to any symbol in the result that are
+  tagged with the corresponding key in the coercers map.
+
+  By default coercers for int and uuid are included."
   [{:keys [routes handlers middleware coercers]}]
   {:pre [(set/subset? (set (result-keys routes)) (set (keys handlers)))]}
   (let [handlers    (wrap-handler-map handlers routes middleware)

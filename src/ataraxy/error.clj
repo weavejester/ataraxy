@@ -1,15 +1,20 @@
 (ns ataraxy.error
+  "A namespace that contains Ataraxy's standard error results, and adds default
+  handler methods for each one."
   (:require [ataraxy.handler :as handler]
             [ataraxy.response :as response]))
 
 (def errors
+  "A map of errors to their relative priority."
   {::unmatched-path   0
    ::unmatched-method 1
    ::missing-params   2
    ::missing-destruct 3
    ::failed-coercions 4})
 
-(defn error-result? [result]
+(defn error-result?
+  "Return true if the result is an Ataraxy error result."
+  [result]
   (contains? errors (first result)))
 
 (defmethod handler/sync-default ::unmatched-path [_]
