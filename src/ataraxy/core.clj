@@ -48,8 +48,11 @@
               :routes (conformed-results v)))
           routes))
 
+(defn- all-distinct? [coll]
+  (or (empty? coll) (apply distinct? coll)))
+
 (defn- distinct-result-keys? [routing-table]
-  (apply distinct? (map :key (conformed-results routing-table))))
+  (all-distinct? (map :key (conformed-results routing-table))))
 
 (s/def ::routing-table
   (s/and (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))

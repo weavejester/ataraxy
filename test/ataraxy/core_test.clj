@@ -8,6 +8,7 @@
 (deftest test-valid?
   (are [x y] (= (ataraxy/valid? x) y)
     '{"/foo" [:bar]}        true
+    '{}                     true
     '{"/foo" :bar}          false
     '{"/foo" (:bar)}        false
     '{"/x" [:x], "/y" [:x]} false))
