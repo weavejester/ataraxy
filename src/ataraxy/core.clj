@@ -173,7 +173,7 @@
 (defn- compile-match-path [request path route-params result-form next-form]
   (if (some? path)
     `(let [path-info# (or (:path-info ~request) (:uri ~request))]
-       (if-let [~(path-symbols path) (next (re-matches ~(path-regex path) path-info#))]
+       (if-let [[_# ~@(path-symbols path)] (re-matches ~(path-regex path) path-info#)]
          (let [~route-params ~(compile-route-params route-params path)]
            ~next-form)
          ~(result-form [::err/unmatched-path])))

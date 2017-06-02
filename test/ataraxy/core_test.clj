@@ -15,8 +15,9 @@
 
 (deftest test-matches
   (testing "string routes"
-    (let [routes '{"/foo" [:foo], "/bar" [:bar]}]
+    (let [routes '{"/" [:idx] "/foo" [:foo], "/bar" [:bar]}]
       (are [req res] (= (ataraxy/matches routes req) res)
+        {:uri "/"}          [:idx]
         {:uri "/foo"}       [:foo]
         {:path-info "/bar"} [:bar]
         {:uri "/baz"}       [::err/unmatched-path])))
