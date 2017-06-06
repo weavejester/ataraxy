@@ -102,9 +102,14 @@
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
+(defn- optional-binding? [sym]
+  (str/starts-with? (name sym) "?"))
+
 (defn- compile-coercion [coercers sym]
   (if-let [tag (-> sym meta :tag)]
-    [sym `((~coercers '~tag) ~sym)]))
+    (if (optional-binding? sym)
+      [sym `(if (some? ~sym) ((~coercers '~tag) ~sym))]
+      [sym `((~coercers '~tag) ~sym)])))
 
 (defn- missing-symbol-set [symbols]
   `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
@@ -112,12 +117,9 @@
 (defn- compile-match-result [{:keys [key args]} meta coercers result-form]
   (let [coercions (into {} (keep (partial compile-coercion coercers) args))]
     `(let [~@(apply concat coercions)]
-       (if (and ~@(keys coercions))
+       (if (and ~@(remove optional-binding? (keys coercions)))
          ~(result-form (into [key] args))
          ~(result-form [::err/failed-coercions (missing-symbol-set args)])))))
-
-(defn- optional-binding? [sym]
-  (str/starts-with? (name sym) "?"))
 
 (defn- param-name [sym]
   (if (optional-binding? sym)
