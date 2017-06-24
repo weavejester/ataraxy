@@ -112,7 +112,7 @@ added to the request map passed to the handler:
 
 The handler can also return a result vector instead of a request
 map. Each vector that is returned is checked against the handler map,
-until eventually a Ring response map is returnd.
+until eventually a Ring response map is returned.
 
 The `ataraxy.response` namespace defines a number of responses on
 the default handler, allowing for code like this:
