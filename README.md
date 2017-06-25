@@ -61,9 +61,13 @@ We can match a request map to a result with `matches`:
 => [:foo]
 ```
 
-If Ataraxy cannot find a matching route, then `[:ataraxy/not-found]`
-will be returned. This behavior may be extended in future to support
-different types of failure.
+If Ataraxy cannot correctly match any route, then an error result from
+the `ataraxy.error` namespace is returned. For example:
+
+```clojure
+(ataraxy/matches routes {:uri "/bar"})
+=> [:ataraxy.error/unmatched-path]
+```
 
 For performance, we can also pre-compile the routing data:
 
