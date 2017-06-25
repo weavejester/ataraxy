@@ -10,7 +10,8 @@
    ::unmatched-method 1
    ::missing-params   2
    ::missing-destruct 3
-   ::failed-coercions 4})
+   ::failed-coercions 4
+   ::failed-spec      5})
 
 (defn error-result?
   "Return true if the result is an Ataraxy error result."
@@ -30,4 +31,7 @@
   [::response/bad-request "Bad Request"])
 
 (defmethod handler/sync-default ::failed-coercions [_]
+  [::response/bad-request "Bad Request"])
+
+(defmethod handler/sync-default ::failed-spec [_]
   [::response/bad-request "Bad Request"])

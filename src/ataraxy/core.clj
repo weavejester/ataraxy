@@ -102,6 +102,16 @@
   {:pre [(valid? routes)]}
   (parse-routing-table {} (s/conform ::routing-table-with-meta routes)))
 
+(defmulti result-spec
+  "Return the spec for a result vector. Dispatches off the first element of the
+  vector (the 'key'). Used to spec out :ataraxy/result."
+  first)
+
+(defmethod result-spec :default [_] any?)
+
+(s/def :ataraxy/result
+  (s/and vector? (s/multi-spec result-spec first)))
+
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
 
@@ -115,10 +125,15 @@
   `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
 
 (defn- compile-match-result [{:keys [key args]} meta coercers result-form]
-  (let [coercions (into {} (keep (partial compile-coercion coercers) args))]
+  (let [coercions (into {} (keep (partial compile-coercion coercers) args))
+        result    (gensym "result")
+        failure   (gensym "failure")]
     `(let [~@(apply concat coercions)]
        (if (and ~@(remove optional-binding? (keys coercions)))
-         ~(result-form (into [key] args))
+         (let [~result [~key ~@args]]
+           (if-let [~failure (s/explain-data :ataraxy/result ~result)]
+             ~(result-form [::err/failed-spec failure])
+             ~(result-form result)))
          ~(result-form [::err/failed-coercions (missing-symbol-set args)])))))
 
 (defn- param-name [sym]

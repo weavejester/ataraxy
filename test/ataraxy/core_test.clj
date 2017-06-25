@@ -1,9 +1,13 @@
 (ns ataraxy.core-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.spec.alpha :as s]
+            [clojure.test :refer :all]
             [ataraxy.core :as ataraxy]
             [ataraxy.error :as err]
             [ataraxy.response :as response]
             [clojure.java.io :as io]))
+
+(defmethod ataraxy/result-spec ::foo [_]
+  (s/cat :key keyword? :id (s/and int? #(> % 10))))
 
 (deftest test-valid?
   (are [x y] (= (ataraxy/valid? x) y)
@@ -141,7 +145,23 @@
         {:request-method :put, :uri "/foo/10"} [::err/unmatched-method]
         {:request-method :get, :uri "/foo/10"} [::err/missing-params '#{page}]
         {:request-method :get, :uri "/foo/10"
-         :query-params {"page" "x"}}           [::err/failed-coercions '#{page}]))))
+         :query-params {"page" "x"}}           [::err/failed-coercions '#{page}])))
+
+  (testing "specs"
+    (let [routes '{[:get "/foo/" id] [::foo ^int id]}]
+      (are [req res] (= (ataraxy/matches routes req) res)
+        {:request-method :get, :uri "/foo/20"} [::foo 20]
+        {:request-method :get, :uri "/foo/10"}
+        [::err/failed-spec
+         '#:clojure.spec.alpha{:problems
+                               [{:path [:ataraxy.core-test/foo :id],
+                                 :pred
+                                 (clojure.core/fn [%] (clojure.core/> % 10)),
+                                 :val 10,
+                                 :via [:ataraxy/result],
+                                 :in [1]}],
+                               :spec :ataraxy/result,
+                               :value [:ataraxy.core-test/foo 10]}]))))
 
 (deftest test-handler
   (testing "synchronous handler"
