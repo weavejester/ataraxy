@@ -389,6 +389,29 @@ And similarly to handlers:
 ```
 
 
+## Specs
+
+Results are validated via the `:ataraxy/result` spec. This is a
+multi-spec that dispatches off the key, and can be assigned behavior
+through the through the `result-spec` multimethod.
+
+For example:
+
+```clojure
+(require '[clojure.spec.alpha :as s])
+
+(defmethod ataraxy/result-spec ::foo [_]
+  (s/cat :key any? :id nat-int?))
+```
+
+This ensures that any result with `::foo` as the key must have exactly
+two elements, with the second being a natural number.
+
+If a spec fails, then a `:ataraxy.error/failed-spec` result is
+returned, which if left alone resolves to a 400 "Bad Request"
+response in the handler.
+
+
 ## License
 
 Copyright © 2017 James Reeves
