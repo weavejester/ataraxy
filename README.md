@@ -69,6 +69,8 @@ the `ataraxy.error` namespace is returned. For example:
 => [:ataraxy.error/unmatched-path]
 ```
 
+See the [errors](#errors) section for more details.
+
 For performance, we can also pre-compile the routing data:
 
 ```clojure
@@ -331,6 +333,24 @@ You can also use nesting and vectors together:
  {:get [:get-user name]
   :put [:put-user name]}}
 ```
+
+
+## Errors
+
+When something goes wrong, Ataraxy returns one of the following error
+results:
+
+* `:ataraxy.error/unmatched-path`
+* `:ataraxy.error/unmatched-method`
+* `:ataraxy.error/missing-params`
+* `:ataraxy.error/missing-destruct`
+* `:ataraxy.error/failed-coercions`
+* `:ataraxy.error/failed-spec`
+
+If you're using the `ataraxy.core/handler` function, these are
+automatically converted into appropriate Ring response maps. However,
+it's generally worth customizing the error responses to the needs of
+your application.
 
 
 ## Coercers
