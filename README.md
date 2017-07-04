@@ -393,7 +393,7 @@ And similarly to handlers:
 
 Results are validated via the `:ataraxy/result` spec. This is a
 multi-spec that dispatches off the key, and can be assigned behavior
-through the through the `result-spec` multimethod.
+through the `result-spec` multimethod.
 
 For example:
 
