@@ -99,7 +99,7 @@ purpose:
 (def handler
   (ataraxy/handler
    {:routes   routes
-    :handlers {:foo foo}))
+    :handlers {:foo foo}}))
 ```
 
 This function takes a map with three keys:
