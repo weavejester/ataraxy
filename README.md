@@ -102,7 +102,7 @@ purpose:
     :handlers {:foo foo}}))
 ```
 
-This function takes a map with three keys:
+This function takes a map with these keys:
 
 * `:routes`     - the routes to match
 * `:handlers`   - a map of result keys to Ring handlers
