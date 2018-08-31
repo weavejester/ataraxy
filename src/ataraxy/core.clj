@@ -54,8 +54,15 @@
 (defn- distinct-result-keys? [routing-table]
   (all-distinct? (map :key (conformed-results routing-table))))
 
+(defn- transform-map->list [m]
+  (if (map? m)
+    (apply list (mapcat seq m))
+    ::s/invalid))
+
 (s/def ::routing-table
-  (s/and (s/or :unordered (s/and map?  (s/* (s/spec ::route-result)))
+  (s/and (s/or :unordered (s/and map?
+                                 (s/conformer transform-map->list)
+                                 (s/* ::route-result))
                :ordered   (s/and list? (s/* ::route-result)))
          distinct-result-keys?))
 
