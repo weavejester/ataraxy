@@ -131,7 +131,7 @@ the default handler, allowing for code like this:
 
 (def handler
   (ataraxy/handler
-    {:routes   {[:get "/hello/" name] [:hello name]}
+    {:routes   '{[:get "/hello/" name] [:hello name]}
      :handlers {:hello hello}}))
 ```
 
