@@ -122,26 +122,31 @@
 (defn- optional-binding? [sym]
   (str/starts-with? (name sym) "?"))
 
+(defn- remove-meta-tag [x]
+  (vary-meta x dissoc :tag))
+
 (defn- compile-coercion [coercers sym]
   (if-let [tag (-> sym meta :tag)]
-    (if (optional-binding? sym)
-      [sym `(if (some? ~sym) ((~coercers '~tag) ~sym))]
-      [sym `((~coercers '~tag) ~sym)])))
+    (let [sym (remove-meta-tag sym)]
+      (if (optional-binding? sym)
+        [sym `(if (some? ~sym) ((~coercers '~tag) ~sym))]
+        [sym `((~coercers '~tag) ~sym)]))))
 
 (defn- missing-symbol-set [symbols]
   `(-> #{} ~@(for [sym symbols] `(cond-> (not ~sym) (conj '~sym)))))
 
 (defn- compile-match-result [{:keys [key args]} meta coercers result-form]
-  (let [coercions (into {} (keep (partial compile-coercion coercers) args))
-        result    (gensym "result")
-        failure   (gensym "failure")]
+  (let [coercions  (into {} (keep (partial compile-coercion coercers) args))
+        clean-args (map remove-meta-tag args)
+        result     (gensym "result")
+        failure    (gensym "failure")]
     `(let [~@(apply concat coercions)]
        (if (and ~@(remove optional-binding? (keys coercions)))
-         (let [~result [~key ~@args]]
+         (let [~result [~key ~@clean-args]]
            (if-let [~failure (s/explain-data :ataraxy/result ~result)]
              ~(result-form [::err/failed-spec failure])
              ~(result-form result)))
-         ~(result-form [::err/failed-coercions (missing-symbol-set args)])))))
+         ~(result-form [::err/failed-coercions (missing-symbol-set clean-args)])))))
 
 (defn- param-name [sym]
   (if (optional-binding? sym)
