@@ -266,6 +266,10 @@ For example:
 This will match any request with `q` as a parameter. For example,
 "/search?q=foo".
 
+In order to match query parameters, the request map needs a
+`:query-params` key, which is supplied by the [wrap-params][]
+middleware in Ring.
+
 By default, the parameters must be set for the route to match. If you
 want the parameters to be optional, you can prefix them with a "?".
 
@@ -275,6 +279,8 @@ want the parameters to be optional, you can prefix them with a "?".
 
 This works the same as the previous example, except that the route
 still matches if `q` is `nil`.
+
+[wrap-params]: https://ring-clojure.github.io/ring/ring.middleware.params.html#var-wrap-params
 
 ### Map routes
 
