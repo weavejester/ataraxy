@@ -54,6 +54,13 @@ requests. See the following section on [syntax](#syntax) for details.
 (def routes '{"/foo" [:foo]})
 ```
 
+Note: In the following examples, we use aliasing:
+```clojure
+(require '[ataraxy.core :as ataraxy])
+```
+
+Let's take a look at routing examples.
+
 We can match a request map to a result with `matches`:
 
 ```clojure
