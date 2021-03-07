@@ -57,6 +57,8 @@ requests. See the following section on [syntax](#syntax) for details.
 We can match a request map to a result with `matches`:
 
 ```clojure
+(require '[ataraxy.core :as ataraxy])
+
 (ataraxy/matches routes {:uri "/foo"})
 => [:foo]
 ```
