@@ -110,6 +110,9 @@
 (defmethod handler/sync-default ::expectation-failed [{[_ body] :ataraxy/result}]
   (-> (->response body) (resp/status 417)))
 
+(defmethod handler/sync-default ::unprocessable-entity [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 422)))
+
 (defmethod handler/sync-default ::precondition-required [{[_ body] :ataraxy/result}]
   (-> (->response body) (resp/status 428)))
 
