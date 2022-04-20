@@ -1,3 +1,7 @@
+## 0.4.3 (2022-04-20)
+
+* Added ::unprocessable-entity response (#22)
+
 ## 0.4.2 (2018-09-28)
 
 * Fixed issue with coercions (#18)

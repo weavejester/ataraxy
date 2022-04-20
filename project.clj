@@ -1,4 +1,4 @@
-(defproject ataraxy "0.4.2"
+(defproject ataraxy "0.4.3"
   :description "A data-driven Ring routing and destructuring library"
   :url "https://github.com/weavejester/ataraxy"
   :license {:name "Eclipse Public License"
