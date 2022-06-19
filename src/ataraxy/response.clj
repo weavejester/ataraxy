@@ -131,5 +131,5 @@
 (defmethod handler/sync-default ::not-implemented [{[_ body] :ataraxy/result}]
   (-> (->response body) (resp/status 501)))
 
-(defmethod handler/sync-default ::service-unavailable [{[_ body] :ataraxy/result}]
+(defmethod handler/sync-default ::bad-gateway [{[_ body] :ataraxy/result}]
   (-> (->response body) (resp/status 502)))
