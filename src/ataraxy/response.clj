@@ -133,3 +133,27 @@
 
 (defmethod handler/sync-default ::bad-gateway [{[_ body] :ataraxy/result}]
   (-> (->response body) (resp/status 502)))
+
+(defmethod handler/sync-default ::service-unavailable [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 503)))
+
+(defmethod handler/sync-default ::gateway-timeout [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 504)))
+
+(defmethod handler/sync-default ::http-version-not-supported [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 505)))
+
+(defmethod handler/sync-default ::gateway-timeout [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 506)))
+
+(defmethod handler/sync-default ::insufficient-storage [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 507)))
+
+(defmethod handler/sync-default ::loop-detected [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 508)))
+
+(defmethod handler/sync-default ::not-extented [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 510)))
+
+(defmethod handler/sync-default ::network-authentication-required [{[_ body] :ataraxy/result}]
+  (-> (->response body) (resp/status 511)))
